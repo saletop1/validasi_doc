@@ -51,7 +51,6 @@
         background-color: #212529;
         color: white;
     }
-
     .table-item-info .main-item-row:hover {
         background-color: #f5f5f5;
     }
@@ -104,6 +103,16 @@
     .summary-card h4 {
         margin-top: 0.25rem;
     }
+
+    /* --- PERBAIKAN: Gaya untuk HU yang sudah discan --- */
+    .details-table .hu-scanned {
+        background-color: #d1e7dd !important; /* Warna hijau muda */
+        font-weight: 500;
+    }
+    .details-table .hu-scanned .scan-status-icon {
+        color: #198754; /* Warna hijau tua untuk ikon centang */
+    }
+
     #loader {
         display: none;
         border: 5px solid #f3f3f3;
@@ -276,18 +285,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showAlert(title, text, icon) {
-        Swal.fire({ title, text, icon, timer: 2000, showConfirmButton: false });
+        Swal.fire({ title, text, icon, timer: 1500, showConfirmButton: false });
     }
 
     // --- FUNGSI UTAMA ---
     function searchDO() {
         const doNumber = doNumberInput.value.trim();
-        if (!doNumber) {
-            // Hapus progress jika input kosong
-            sessionStorage.removeItem('lastSearchedDO');
-            sessionStorage.removeItem(`scanProgress_${doNumber}`);
-            return;
-        }
+        if (!doNumber) { return; }
         loader.style.display = 'block';
 
         fetch('{{ route("do.verify.search") }}', {
@@ -299,7 +303,6 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 currentDOData = data.data;
-                scannedHUs.clear();
                 displayDODetails();
                 doDetailsSection.classList.remove('d-none');
                 sessionStorage.setItem('lastSearchedDO', doNumber);
@@ -307,7 +310,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert('Gagal', data.message || 'Data tidak ditemukan.', 'error');
                 doDetailsSection.classList.add('d-none');
                 sessionStorage.removeItem('lastSearchedDO');
-                sessionStorage.removeItem(`scanProgress_${doNumber}`);
             }
         })
         .finally(() => {
@@ -318,13 +320,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayDODetails() {
         if (!currentDOData) return;
 
-        // PERBAIKAN: Muat progres dari sessionStorage
-        const savedProgress = JSON.parse(sessionStorage.getItem(`scanProgress_${doNumberInput.value.trim()}`));
-        if (savedProgress && savedProgress.hus) {
-            scannedHUs = new Set(savedProgress.hus);
-        } else {
-            scannedHUs.clear();
-        }
+        const savedProgress = currentDOData.progress;
+        scannedHUs = new Set(savedProgress.hus || []);
 
         document.getElementById('customer-name').textContent = currentDOData.customer || 'T/A';
         document.getElementById('customer-address').textContent = currentDOData.address || 'T/A';
@@ -337,17 +334,49 @@ document.addEventListener('DOMContentLoaded', function() {
             const detailsId = `details-item-${index}`;
             let detailsHtml = '';
             let batchHuCellHtml = '';
-            // Muat jumlah scan yang tersimpan
-            const savedScanCount = (savedProgress && savedProgress.counts) ? (savedProgress.counts[item.material] || 0) : 0;
+            const savedScanCount = savedProgress.counts[item.material] || 0;
 
             if (item.is_hu) {
                 batchHuCellHtml = `<span class="hu-count-badge">${item.hu_details.length} HU<i class="info-icon" data-bs-target="#${detailsId}">i</i></span>`;
-                detailsHtml = `<tr class="details-row collapse" id="${detailsId}"><td colspan="9"><div class="details-table-wrapper"><h6 class="mb-2">Rincian Handling Units (HU)</h6><table class="table table-bordered table-sm details-table"><thead><tr><th>HU Number</th><th>Batch Number</th><th>DO</th><th>Item</th></tr></thead><tbody>${item.hu_details.map(detail => `<tr><td>${detail.hu_no}</td><td>${detail.batch_no}</td><td>${detail.do_no}</td><td>${detail.item_no}</td></tr>`).join('')}</tbody></table></div></td></tr>`;
+
+                // PERBAIKAN: Buat tabel detail dengan status
+                let detailRows = item.hu_details.map(detail => {
+                    const isScanned = scannedHUs.has(detail.hu_no);
+                    const rowClass = isScanned ? 'hu-scanned' : '';
+                    const statusIcon = isScanned ? '<i class="fas fa-check-circle scan-status-icon"></i>' : '';
+                    return `<tr class="${rowClass}">
+                                <td>${detail.hu_no}</td>
+                                <td>${detail.batch_no}</td>
+                                <td>${detail.do_no}</td>
+                                <td>${detail.item_no}</td>
+                                <td class="text-center">${statusIcon}</td>
+                            </tr>`;
+                }).join('');
+
+                detailsHtml = `
+                    <tr class="details-row collapse" id="${detailsId}">
+                        <td colspan="9">
+                            <div class="details-table-wrapper">
+                                <h6 class="mb-2">Rincian Handling Units (HU)</h6>
+                                <table class="table table-bordered table-sm details-table">
+                                    <thead>
+                                        <tr>
+                                            <th>HU Number</th>
+                                            <th>Batch Number</th>
+                                            <th>DO</th>
+                                            <th>Item</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${detailRows}</tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>`;
             } else {
                 batchHuCellHtml = `<span>${item.batch_no}</span>`;
             }
 
-            // Tentukan status awal berdasarkan progres yang dimuat
             let initialStatusClass = 'bg-secondary';
             let initialStatusText = 'Belum Diverifikasi';
             if (savedScanCount > 0) {
@@ -366,7 +395,6 @@ document.addEventListener('DOMContentLoaded', function() {
             pickingListBody.innerHTML += mainRowHtml + detailsHtml;
         });
 
-        // Event listener manual untuk ikon 'i'
         document.querySelectorAll('.info-icon').forEach(icon => {
             icon.addEventListener('click', function (event) {
                 event.stopPropagation();
@@ -374,14 +402,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (targetId) {
                     const targetElement = document.querySelector(targetId);
                     if (targetElement) {
-                        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(targetElement);
-                        bsCollapse.toggle();
+                        bootstrap.Collapse.getOrCreateInstance(targetElement).toggle();
                     }
                 }
             });
         });
 
-        // Event listener untuk styling saat expand/collapse
         document.querySelectorAll('.details-row.collapse').forEach(detailsRow => {
             const mainRowId = `main-row-${detailsRow.id.split('-').pop()}`;
             const mainRow = document.getElementById(mainRowId);
@@ -391,41 +417,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Inisialisasi ringkasan
         updateSummary();
     }
 
-    // --- FUNGSI SCANNING & SUMMARY BARU ---
     function processScannedBarcode(barcode) {
         if (!currentDOData) return;
 
         const code = barcode.trim();
         let foundItem = null;
         let isHUscan = false;
+        let batchNumber = null;
 
         for (const item of currentDOData.items) {
-            if (item.is_hu && item.hu_details.some(detail => detail.hu_no === code)) {
-                foundItem = item;
-                isHUscan = true;
-                break;
-            }
-            if (item.material === code) {
-                if (item.is_hu) {
-                    showAlert('Scan HU!', `Item ini dikelola oleh HU. Silakan scan nomor HU.`, 'warning');
-                    return;
+            if (item.is_hu) {
+                const foundHU = item.hu_details.find(detail => detail.hu_no === code);
+                if (foundHU) {
+                    foundItem = item;
+                    isHUscan = true;
+                    batchNumber = foundHU.batch_no;
+                    break;
                 }
+            }
+            if (!item.is_hu && item.material === code) {
                 foundItem = item;
                 isHUscan = false;
+                batchNumber = item.batch_no;
                 break;
             }
         }
 
-        if (foundItem) {
-            if (isHUscan && scannedHUs.has(code)) {
-                showAlert('Duplikat!', `HU ${code} sudah pernah discan.`, 'warning');
-                return;
-            }
+        if (foundItem && isHUscan && scannedHUs.has(code)) {
+            showAlert('Duplikat!', `HU ${code} sudah pernah discan.`, 'warning');
+            return;
+        }
 
+        if (foundItem) {
             const qtyOrder = foundItem.qty_order;
             const scanCountEl = document.getElementById(`scancount-${foundItem.material}`);
             let currentScan = parseInt(scanCountEl.textContent, 10);
@@ -440,18 +466,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 showAlert('Berhasil!', `Item ${foundItem.material} discan.`, 'success');
 
+                saveScanToDatabase({
+                    do_number: foundItem.do_no,
+                    item_number: foundItem.item_no,
+                    material_number: foundItem.material,
+                    scanned_code: code,
+                    batch_number: batchNumber
+                });
+
                 const statusEl = document.getElementById(`status-${foundItem.material}`).querySelector('.badge');
                 if (currentScan === qtyOrder) {
                     statusEl.textContent = 'Lengkap';
-                    statusEl.classList.remove('bg-secondary', 'bg-warning');
-                    statusEl.classList.add('bg-success');
+                    statusEl.className = 'badge bg-success';
                 } else {
                     statusEl.textContent = 'Kurang';
-                    statusEl.classList.remove('bg-secondary', 'bg-success');
-                    statusEl.classList.add('bg-warning');
+                    statusEl.className = 'badge bg-warning';
                 }
 
                 updateSummary();
+                // PERBAIKAN: Panggil fungsi untuk update tampilan detail HU setelah scan
+                updateHUDetailView();
             } else {
                 showAlert('Penuh!', `Item ${foundItem.material} sudah memenuhi kuantitas.`, 'warning');
             }
@@ -460,36 +494,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // PERBAIKAN: Fungsi baru untuk update tampilan detail HU
+    function updateHUDetailView() {
+        document.querySelectorAll('.details-table tbody tr').forEach(row => {
+            const huNumberCell = row.cells[0];
+            if (huNumberCell && scannedHUs.has(huNumberCell.textContent)) {
+                row.classList.add('hu-scanned');
+                const statusCell = row.cells[4]; // Kolom status (indeks ke-4)
+                if (statusCell && !statusCell.querySelector('.scan-status-icon')) {
+                    statusCell.innerHTML = '<i class="fas fa-check-circle scan-status-icon"></i>';
+                }
+            }
+        });
+    }
+
+
+    async function saveScanToDatabase(scanData) {
+        try {
+            await fetch('{{ route("do.verify.scan") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                body: JSON.stringify(scanData)
+            });
+        } catch (error) {
+            console.error('Gagal menyimpan scan ke database:', error);
+            showAlert('Offline', 'Gagal menyimpan scan, periksa koneksi.', 'error');
+        }
+    }
+
     function updateSummary() {
         if (!currentDOData) return;
-
         let totalOrder = 0;
         let totalScanned = 0;
         const totalItems = currentDOData.items.length;
-        const currentProgress = {
-            counts: {},
-            hus: Array.from(scannedHUs)
-        };
 
         currentDOData.items.forEach(item => {
             totalOrder += item.qty_order;
             const scanCountEl = document.getElementById(`scancount-${item.material}`);
             if (scanCountEl) {
-                const scannedValue = parseInt(scanCountEl.textContent, 10);
-                totalScanned += scannedValue;
-                currentProgress.counts[item.material] = scannedValue;
+                totalScanned += parseInt(scanCountEl.textContent, 10);
             }
         });
 
         const sisa = totalOrder - totalScanned;
-
         document.getElementById('summary-total-item').textContent = totalItems;
         document.getElementById('summary-qty-order').textContent = totalOrder;
         document.getElementById('summary-qty-scanned').textContent = totalScanned;
         document.getElementById('summary-sisa').textContent = sisa;
-
-        // PERBAIKAN: Simpan progres setiap kali summary di-update
-        sessionStorage.setItem(`scanProgress_${doNumberInput.value.trim()}`, JSON.stringify(currentProgress));
     }
 
     // --- EVENT LISTENERS ---
@@ -527,23 +578,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function onScanSuccess(decodedText, decodedResult) {
-        // PERBAIKAN: Logika Jeda (Cooldown)
-        if (isScanCooldown) {
-            return; // Abaikan scan jika masih dalam masa jeda
-        }
-
+        if (isScanCooldown) { return; }
         processScannedBarcode(decodedText);
-
         isScanCooldown = true;
-        setTimeout(() => {
-            isScanCooldown = false;
-        }, 3000); // Jeda 3 detik
+        setTimeout(() => { isScanCooldown = false; }, 3000); // Jeda 3 detik
     }
 
-    function onScanFailure(error) {
-        // Abaikan error
-    }
-
+    function onScanFailure(error) { /* Abaikan error */ }
 });
 </script>
 @endpush

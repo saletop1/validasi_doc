@@ -46,37 +46,40 @@ def get_do_details():
             return jsonify({"success": False, "message": "Koneksi SAP gagal."}), 500
 
         logging.info(f"Memanggil RFC Z_FM_YSDR002 untuk DO: {do_number}")
-
-        # Menggunakan nama RFC yang benar
         result = conn.call('Z_FM_YSDR002', P_VBELN=do_number)
 
-        # Validasi error dari SAP
-        return_msgs = result.get('RETURN', [])
-        if any(msg.get('TYPE') in ('E', 'A') for msg in return_msgs):
-             error_msg = next((msg['MESSAGE'] for msg in return_msgs if msg['TYPE'] in ('E', 'A')), "Error dari SAP.")
-             logging.error(f"RFC Gagal: {error_msg}")
-             return jsonify({"success": False, "message": error_msg}), 404
+        logging.info(f"--- HASIL MENTAH DARI SAP UNTUK DO {do_number} ---")
+        logging.info(result)
+        logging.info("---------------------------------------------")
 
-        # Ambil data mentah dari tabel T_DATA
         t_data = result.get('T_DATA', [])
-
-        # PERUBAHAN: Sekarang mengambil data T_DATA2 dari hasil RFC
         t_data2 = result.get('T_DATA2', [])
 
-        if not t_data:
-            return jsonify({"success": False, "message": f"DO {do_number} tidak memiliki item."}), 404
-
-        # Kirim data mentah ke Laravel
-        raw_sap_data = {
-            "success": True,
-            "data": {
-                "t_data": t_data,
-                "t_data2": t_data2
+        # --- PERBAIKAN LOGIKA ---
+        # Prioritaskan data. Jika T_DATA ada isinya, kita anggap sukses.
+        if t_data:
+            logging.info(f"T_DATA ditemukan ({len(t_data)} baris). Mengabaikan kemungkinan 'false error' di RETURN dan melanjutkan proses.")
+            raw_sap_data = {
+                "success": True,
+                "data": {
+                    "t_data": t_data,
+                    "t_data2": t_data2
+                }
             }
-        }
+            return jsonify(raw_sap_data)
 
-        logging.info(f"Berhasil mengambil {len(t_data)} item dan {len(t_data2)} detail untuk DO {do_number}.")
-        return jsonify(raw_sap_data)
+        # Jika T_DATA kosong, baru kita periksa tabel RETURN untuk pesan error yang sebenarnya.
+        return_msgs = result.get('RETURN', [])
+        # Cari pesan error yang tipenya 'E' atau 'A' DAN isinya tidak kosong.
+        error_msg = next((msg.get('MESSAGE') for msg in return_msgs if msg.get('TYPE') in ('E', 'A') and msg.get('MESSAGE', '').strip()), None)
+
+        if error_msg:
+            logging.error(f"RFC Gagal karena pesan RETURN dari SAP: {error_msg}")
+            return jsonify({"success": False, "message": error_msg}), 404
+        else:
+            # Jika T_DATA kosong dan tidak ada pesan error, berarti DO tidak ditemukan.
+            logging.warning(f"DO {do_number} tidak memiliki item di T_DATA dan tidak ada pesan error. Mengembalikan 'tidak ditemukan'.")
+            return jsonify({"success": False, "message": f"DO {do_number} tidak ditemukan atau tidak memiliki item."}), 404
 
     except Exception as e:
         error_msg = f"Error saat memproses DO: {str(e)}"

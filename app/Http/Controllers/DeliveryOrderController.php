@@ -29,6 +29,9 @@ class DeliveryOrderController extends Controller
     public function searchDO(Request $request)
     {
         $doNumber = $request->input('do_number');
+        if (empty($doNumber)) {
+            return response()->json(['success' => false, 'message' => 'Nomor DO tidak boleh kosong.'], 400);
+        }
         $credentials = $this->getSapCredentials();
 
         try {
@@ -38,27 +41,38 @@ class DeliveryOrderController extends Controller
                 'P_VBELN' => $doNumber,
             ]);
 
-            if (!$response->successful()) {
-                return response()->json(['success' => false, 'message' => 'Gagal terhubung ke API Python/SAP.'], 500);
+            // --- PERBAIKAN LOGIKA PENANGANAN ERROR ---
+
+            // Jika respons GAGAL TOTAL (server python mati, timeout, dll.)
+            if ($response->failed()) {
+                // Coba baca pesan error dari Python jika ada
+                $errorData = $response->json();
+                $errorMessage = $errorData['message'] ?? 'Gagal terhubung ke API Python/SAP.';
+                return response()->json(['success' => false, 'message' => $errorMessage], $response->status());
             }
 
+            // Jika respons SUKSES SECARA KONEKSI, tapi bisa jadi berisi pesan "data tidak ditemukan"
             $sapData = $response->json();
 
+            // Cek flag 'success' dari Python dan apakah data kosong
             if (!($sapData['success'] ?? false) || empty($sapData['data']['t_data'])) {
-                return response()->json(['success' => false, 'message' => $sapData['message'] ?? 'Data tidak ditemukan di SAP.'], 404);
+                $errorMessage = $sapData['message'] ?? 'Data tidak ditemukan di SAP.';
+                return response()->json(['success' => false, 'message' => $errorMessage], 404);
             }
 
-            // Simpan data mentah ke database dengan struktur baru
+            // Jika semua aman, lanjutkan proses
             $this->saveToDatabase($sapData['data']);
 
             $rawData = $sapData['data'];
             $items = $rawData['t_data'];
 
+            $scannedItems = DB::table('scanned_items')->where('do_number', $doNumber)->get();
+            $scannedCounts = $scannedItems->countBy('material_number');
+            $scannedHuList = $scannedItems->pluck('scanned_code')->all();
+
             $findFirstValue = function($key, $itemArray) {
                 foreach ($itemArray as $item) {
-                    if (isset($item[$key]) && !empty(trim($item[$key]))) {
-                        return trim($item[$key]);
-                    }
+                    if (isset($item[$key]) && !empty(trim($item[$key]))) { return trim($item[$key]); }
                 }
                 return 'T/A';
             };
@@ -87,8 +101,7 @@ class DeliveryOrderController extends Controller
                     $hu_details = $details->map(function($detail) {
                         return [
                             'hu_no'    => ltrim($detail['EXIDV'] ?? 'N/A', '0'),
-                            // PERUBAHAN: Batch untuk T_DATA2 diambil dari CHARG
-                            'batch_no' => $detail['CHARG'] ?? 'N/A',
+                            'batch_no' => $detail['CHARG'] ?? 'N/A', // Batch dari T_DATA2
                             'do_no'    => ltrim($detail['DELV'] ?? 'N/A', '0'),
                             'item_no'  => ltrim($detail['ITEM'] ?? 'N/A', '0'),
                         ];
@@ -102,8 +115,7 @@ class DeliveryOrderController extends Controller
                     'hu_details'  => $hu_details,
                     'do_no'       => $doKey,
                     'item_no'     => $itemKey,
-                    // PERUBAHAN: Batch untuk T_DATA diambil dari CHARG2
-                    'batch_no'    => $item['CHARG2'] ?? 'N/A',
+                    'batch_no'    => $item['CHARG2'] ?? 'N/A', // Batch dari T_DATA
                     'is_hu'       => !empty($hu_details)
                 ];
             });
@@ -114,14 +126,14 @@ class DeliveryOrderController extends Controller
                 "shipping_point" => $shippingPoint,
                 "ship_to"        => $shipTo,
                 "ship_type"      => $shipType,
-                "items"          => $formattedItems
+                "items"          => $formattedItems,
+                "progress"       => [
+                    "counts" => $scannedCounts,
+                    "hus" => $scannedHuList
+                ]
             ];
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil diambil dari SAP dan disimpan.',
-                'data' => $formattedData,
-            ]);
+            return response()->json(['success' => true, 'data' => $formattedData]);
 
         } catch (Throwable $e) {
             Log::error('Kesalahan fatal saat mencari DO: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -129,63 +141,69 @@ class DeliveryOrderController extends Controller
         }
     }
 
+    public function saveScan(Request $request)
+    {
+        $validated = $request->validate([
+            'do_number' => 'required|string|max:255',
+            'item_number' => 'required|string|max:255',
+            'material_number' => 'required|string|max:255',
+            'scanned_code' => 'required|string|max:255',
+            'batch_number' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            DB::table('scanned_items')->insertOrIgnore([
+                'do_number' => $validated['do_number'],
+                'item_number' => $validated['item_number'],
+                'material_number' => $validated['material_number'],
+                'scanned_code' => $validated['scanned_code'],
+                'batch_number' => $validated['batch_number'],
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]);
+            return response()->json(['success' => true, 'message' => 'Scan saved.']);
+        } catch (Throwable $e) {
+            Log::error('Gagal menyimpan scan: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error while saving scan.'], 500);
+        }
+    }
+
     private function saveToDatabase($data)
     {
         $doNumber = $data['t_data'][0]['VBELN'] ?? null;
-
         if (!$doNumber || DB::table('do_list')->where('VBELN', $doNumber)->exists()) {
             if ($doNumber) Log::info("Penyimpanan dilewati: DO {$doNumber} sudah ada.");
             return;
         }
 
         try {
-            DB::transaction(function () use ($data, $doNumber) {
+            DB::transaction(function () use ($data) {
                 $now = Carbon::now();
-
                 foreach ($data['t_data'] as $item) {
                     DB::table('do_list')->insert([
-                        'WERKS' => $item['WERKS'] ?? null,
-                        'LGORT' => $item['LGORT'] ?? null,
-                        'VBELN' => $item['VBELN'] ?? null,
-                        'POSNR' => $item['POSNR'] ?? null,
-                        'LFIMG' => $item['LFIMG'] ?? null,
-                        'NAME1' => $item['NAME1'] ?? null,
-                        'MATNR' => $item['MATNR'] ?? null,
-                        'MAKTX' => $item['MAKTX'] ?? null,
-                        'V_SO' => $item['V_SO'] ?? null,
-                        'V_SOITEM' => $item['V_SOITEM'] ?? null,
-                        'BSTNK' => $item['BSTNK'] ?? null,
-                        'WADAT_IST' => $item['WADAT_IST'] ?? null,
-                        // PERUBAHAN: Menyimpan dari CHARG2 ke kolom CHARG2
-                        'CHARG2' => $item['CHARG2'] ?? null,
-                        'ADDRESS' => $item['ADDRESS'] ?? null,
-                        'BEZEI2' => $item['BEZEI2'] ?? null,
-                        'VTEXT' => $item['VTEXT'] ?? null,
-                        'SHIPTO' => $item['SHIPTO'] ?? null,
-                        'SCANNED_QTY' => 0,
-                        'VERIFIED_AT' => null,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        'WERKS' => $item['WERKS'] ?? null, 'LGORT' => $item['LGORT'] ?? null,
+                        'VBELN' => $item['VBELN'] ?? null, 'POSNR' => $item['POSNR'] ?? null,
+                        'LFIMG' => $item['LFIMG'] ?? null, 'NAME1' => $item['NAME1'] ?? null,
+                        'MATNR' => $item['MATNR'] ?? null, 'MAKTX' => $item['MAKTX'] ?? null,
+                        'V_SO' => $item['V_SO'] ?? null, 'V_SOITEM' => $item['V_SOITEM'] ?? null,
+                        'BSTNK' => $item['BSTNK'] ?? null, 'WADAT_IST' => $item['WADAT_IST'] ?? null,
+                        'CHARG2' => $item['CHARG2'] ?? null, 'ADDRESS' => $item['ADDRESS'] ?? null,
+                        'BEZEI2' => $item['BEZEI2'] ?? null, 'VTEXT' => $item['VTEXT'] ?? null,
+                        'SHIPTO' => $item['SHIPTO'] ?? null, 'SCANNED_QTY' => 0,
+                        'VERIFIED_AT' => null, 'created_at' => $now, 'updated_at' => $now,
                     ]);
                 }
 
-                // Logika penyimpanan untuk do_list_details tidak berubah karena sudah benar
                 foreach ($data['t_data2'] as $detailItem) {
                     DB::table('do_list_details')->insert([
                         'EXIDV' => ltrim($detailItem['EXIDV'] ?? '', '0'),
-                        'ITEM' => $detailItem['ITEM'] ?? null,
-                        'VEMNG' => $detailItem['VEMNG'] ?? null,
-                        'VEMEH' => $detailItem['VEMEH'] ?? null,
-                        'DELV' => $detailItem['DELV'] ?? null,
-                        'KDAUF' => $detailItem['KDAUF'] ?? null,
-                        'KDPOS' => $detailItem['KDPOS'] ?? null,
-                        'MATNR' => $detailItem['MATNR'] ?? null,
-                        'MAKTX' => $detailItem['MAKTX'] ?? null,
-                        'BSTKD' => $detailItem['BSTKD'] ?? null,
-                        'CHARG' => $detailItem['CHARG'] ?? null,
+                        'ITEM' => $detailItem['ITEM'] ?? null, 'VEMNG' => $detailItem['VEMNG'] ?? null,
+                        'VEMEH' => $detailItem['VEMEH'] ?? null, 'DELV' => $detailItem['DELV'] ?? null,
+                        'KDAUF' => $detailItem['KDAUF'] ?? null, 'KDPOS' => $detailItem['KDPOS'] ?? null,
+                        'MATNR' => $detailItem['MATNR'] ?? null, 'MAKTX' => $detailItem['MAKTX'] ?? null,
+                        'BSTKD' => $detailItem['BSTKD'] ?? null, 'CHARG' => $detailItem['CHARG'] ?? null,
                         'V_NO_CONT' => $detailItem['V_NO_CONT'] ?? null,
-                        'created_at' => $now,
-                        'updated_at' => $now,
+                        'created_at' => $now, 'updated_at' => $now,
                     ]);
                 }
             });
@@ -196,3 +214,4 @@ class DeliveryOrderController extends Controller
         }
     }
 }
+
