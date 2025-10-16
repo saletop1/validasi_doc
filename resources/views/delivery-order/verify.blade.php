@@ -4,132 +4,232 @@
 
 @push('styles')
 <style>
-    body {
-        background-color: #f8f9fa;
+    :root {
+        --primary-color: #0d6efd;
+        --secondary-color: #6c757d;
+        --success-color: #198754;
+        --warning-color: #ffc107;
+        --info-color: #0dcaf0;
+        --light-gray: #f8f9fa;
+        --dark-color: #212529;
+        --border-color: #dee2e6;
     }
+
+    body {
+        background-color: var(--light-gray);
+        font-family: 'Inter', sans-serif;
+    }
+
     .main-card {
         border: none;
         border-radius: 1rem;
-        box-shadow: 0 0.5rem 1rem 0 rgba(0, 0, 0, 0.1);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.07);
+        overflow: hidden;
     }
+
     .card-header-custom {
-        position: relative;
-        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        background: linear-gradient(45deg, var(--primary-color), var(--info-color));
         color: white;
-        border-radius: 1rem 1rem 0 0 !important;
         padding: 1.5rem;
+        text-align: center;
     }
-    .header-logo {
-        position: absolute;
-        top: 15px;
-        left: 20px;
-        max-height: 60px;
-        opacity: 0.9;
-    }
+
     .card-footer-custom {
-        background-color: #f8f9fa;
-        border-top: 1px solid #e9ecef;
-        border-radius: 0 0 1rem 1rem !important;
+        background-color: #f1f3f5;
+        border-top: 1px solid var(--border-color);
     }
+
     .btn-gradient {
-        background: linear-gradient(45deg, #198754, #28a745);
+        background: linear-gradient(45deg, var(--success-color), #20c997);
         border: none;
         color: white;
+        transition: transform 0.2s;
     }
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .shipping-header-card {
+        background-color: #ffffff;
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        height: 100%;
+    }
+    .company-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .company-info img {
+        max-height: 50px;
+        margin-right: 1.5rem;
+    }
+    .company-details h5 {
+        margin-bottom: 0.25rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    .company-details p {
+        margin-bottom: 0;
+        color: var(--secondary-color);
+        font-size: 0.9rem;
+    }
+    .shipping-details .row > div {
+        margin-bottom: 0.5rem;
+    }
+    .shipping-details strong {
+        display: block;
+        color: var(--secondary-color);
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+    .shipping-details span {
+        font-weight: 600;
+        color: var(--dark-color);
+        font-size: 0.95rem;
+    }
+
+
     .info-card {
         background-color: #e9ecef;
         border-radius: 0.75rem;
         padding: 1.5rem;
         height: 100%;
     }
+
     .table-responsive {
-        max-height: 60vh;
+        max-height: 65vh;
         overflow-y: auto;
+        padding: 0 1rem;
     }
+
+    .table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
     .table thead th {
-        position: sticky; top: 0; z-index: 2;
-        background-color: #212529;
-        color: white;
+        background-color: var(--light-gray);
+        color: var(--dark-color);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border-color);
+        border-top: none;
+        position: sticky;
+        top: 0;
+        z-index: 1;
     }
-    .table-item-info .main-item-row:hover {
-        background-color: #f5f5f5;
+
+    .table tbody tr {
+        border-bottom: 1px solid var(--border-color);
+        transition: background-color 0.2s ease;
     }
-    .info-icon {
-        display: inline-block;
-        width: 22px;
-        height: 22px;
-        line-height: 22px;
-        text-align: center;
-        border-radius: 50%;
-        background-color: #0dcaf0;
-        color: white;
-        font-style: normal;
-        font-weight: bold;
-        cursor: pointer;
-        transition: background-color 0.2s, transform 0.2s;
+
+    .table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f1f3f5;
+    }
+    .table td, .table th {
         vertical-align: middle;
-        margin-left: 5px;
+        padding: 0.8rem 1rem;
+        border: none;
     }
-    .info-icon:hover {
-        background-color: #0b9eb8;
-        transform: scale(1.1);
+
+    .main-item-row.has-details {
+        cursor: pointer;
     }
-    .main-item-row.expanded .info-icon {
-        background-color: #0d6efd;
+
+    .main-item-row.expanded {
+        background-color: #e9ecef;
+        border-left: 4px solid var(--primary-color);
     }
-    .hu-batch-cell {
-        min-width: 120px;
+
+    .material-cell strong {
+        color: var(--dark-color);
+        font-size: 0.95rem;
+    }
+    .material-cell span {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .progress-container {
+        width: 100%;
+        background-color: #e9ecef;
+        border-radius: 10px;
+        height: 20px;
+        overflow: hidden;
+        position: relative;
+    }
+    .progress-bar-scan {
+        height: 100%;
+        background-color: transparent;
+        border-radius: 10px;
+        transition: width 0.4s ease-in-out, background-color 0.5s ease;
+    }
+    .progress-bar-scan.in-process {
+        background-color: var(--warning-color);
+    }
+    .progress-bar-scan.complete {
+        background-color: var(--success-color);
+    }
+
+    /* --- PERBAIKAN: Gaya teks di dalam progress bar --- */
+    .progress-text {
+        position: absolute;
+        width: 100%;
         text-align: center;
+        font-size: 0.8rem;
+        font-weight: 600;
+        line-height: 20px;
+        color: #000000;
+        z-index: 2;
     }
-    .hu-count-badge {
-        font-weight: 500;
-        color: #212529;
-    }
+
     .details-row > td {
         padding: 0 !important;
-        border-top: none;
+        background-color: #f8f9fa;
     }
     .details-table-wrapper {
-        padding: 1rem 1rem 1rem 4rem;
-        background-color: #f1f1f1;
-        border-bottom: 1px solid #dee2e6;
+        padding: 1.25rem;
     }
     .details-table {
         background-color: #ffffff;
-        border-radius: 0.5rem;
-        overflow: hidden;
-        box-shadow: 0 0.2rem 0.5rem rgba(0,0,0,.05);
+        border: 1px solid var(--border-color);
     }
-    .summary-card h4 {
-        margin-top: 0.25rem;
+    .details-table th {
+        background-color: #e9ecef;
     }
 
-    /* --- PERBAIKAN: Gaya untuk HU yang sudah discan --- */
-    .details-table .hu-scanned {
-        background-color: #d1e7dd !important; /* Warna hijau muda */
+    .hu-scanned {
+        background-color: #d1e7dd !important;
+        color: var(--success-color);
         font-weight: 500;
     }
-    .details-table .hu-scanned .scan-status-icon {
-        color: #198754; /* Warna hijau tua untuk ikon centang */
-    }
 
+    .filter-input-group { position: relative; }
+    .filter-input-group .form-control { padding-left: 2.5rem; }
+    .filter-input-group .fa-filter {
+        position: absolute; left: 1rem; top: 50%;
+        transform: translateY(-50%); color: #adb5bd;
+    }
     #loader {
-        display: none;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #3498db;
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
+        display: none; border: 5px solid #f3f3f3;
+        border-top: 5px solid var(--primary-color);
+        border-radius: 50%; width: 50px; height: 50px;
         animation: spin 1s linear infinite;
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        z-index: 1056;
+        position: fixed; top: 50%; left: 50%; z-index: 1056;
     }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 @endpush
 
@@ -137,13 +237,12 @@
 <div id="loader"></div>
 <div class="container-fluid py-4">
     <div class="card main-card">
-        <div class="card-header card-header-custom text-center">
-            <img src="{{ asset('images/KMI.png') }}" alt="Logo KMI" class="header-logo">
+        <div class="card-header card-header-custom">
             <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan Delivery Order (DO)</h2>
         </div>
         <div class="card-body p-4 p-md-5">
             {{-- Bagian Input & Cari DO --}}
-            <div class="row justify-content-center mb-5">
+            <div class="row justify-content-center mb-4">
                 <div class="col-lg-8 col-md-10">
                     <div class="form-group">
                         <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
@@ -156,21 +255,49 @@
             </div>
 
             <div id="do-details" class="d-none">
-                <hr class="my-5">
+                <hr class="my-4">
+
                 <div class="row mb-4">
-                    {{-- Info Pengiriman --}}
-                    <div class="col-lg-6 mb-4 mb-lg-0">
-                        <div class="info-card">
-                            <h4 class="mb-3"><i class="fas fa-info-circle me-2"></i>Informasi Pengiriman</h4>
-                            <p class="mb-2"><strong>Pelanggan:</strong> <span id="customer-name"></span></p>
-                            <p class="mb-2"><strong>Alamat:</strong> <span id="customer-address"></span></p>
-                            <p class="mb-2"><strong>Shipping Point:</strong> <span id="shipping-point"></span></p>
-                            <p class="mb-2"><strong>Ship To:</strong> <span id="ship-to"></span></p>
-                            <p class="mb-0"><strong>Ship Type:</strong> <span id="ship-type"></span></p>
+                    <div class="col-lg-7 mb-4 mb-lg-0">
+                        <div class="shipping-header-card">
+                            <div class="company-info">
+                                <img src="{{ asset('images/KMI.png') }}" alt="Logo KMI">
+                                <div class="company-details">
+                                    <h5>PT. KAYU MEBEL INDONESIA</h5>
+                                    <p>Jl. Jend. Urip Sumoharjo No.134, Semarang</p>
+                                </div>
+                            </div>
+                            <div class="shipping-details">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Pelanggan:</strong>
+                                        <span id="customer-name"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Ship To:</strong>
+                                        <span id="ship-to"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Alamat:</strong>
+                                        <span id="customer-address"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Ship Type:</strong>
+                                        <span id="ship-type"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Shipping Point:</strong>
+                                        <span id="shipping-point"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Container No:</strong>
+                                        <span id="container-no"></span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {{-- Info Scan --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-5">
                          <div class="info-card bg-info text-white text-center d-flex flex-column justify-content-center">
                              <h4 class="mb-3"><i class="fas fa-qrcode me-2"></i>Scan Verifikasi</h4>
                              <p class="mb-2">Gunakan scanner genggam atau klik tombol kamera.</p>
@@ -180,57 +307,48 @@
                     </div>
                 </div>
 
-                {{-- --- KARTU RINGKASAN BARU --- --}}
-                <div class="card mt-4 summary-card">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ringkasan Verifikasi</h5>
-                    </div>
+                {{-- Kartu Ringkasan --}}
+                <div class="card mt-3 summary-card">
+                    <div class="card-header bg-light"><h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ringkasan Verifikasi</h5></div>
                     <div class="card-body">
-                        {{-- Tata letak menjadi 4 kolom --}}
                         <div class="row text-center">
-                            <div class="col-md-3 col-6 mb-3 mb-md-0">
-                                <h6 class="text-muted">Total Item (SKU)</h6>
-                                <h4 class="fw-bold" id="summary-total-item">0</h4>
-                            </div>
-                            <div class="col-md-3 col-6 mb-3 mb-md-0">
-                                <h6 class="text-muted">Total Qty Order</h6>
-                                <h4 class="fw-bold text-primary" id="summary-qty-order">0</h4>
-                            </div>
-                            <div class="col-md-3 col-6 mb-3 mb-md-0">
-                                <h6 class="text-muted">Total Qty Telah Scan</h6>
-                                <h4 class="fw-bold text-success" id="summary-qty-scanned">0</h4>
-                            </div>
-                            <div class="col-md-3 col-6">
-                                <h6 class="text-muted">Total Sisa Belum Scan</h6>
-                                <h4 class="fw-bold text-danger" id="summary-sisa">0</h4>
-                            </div>
+                            <div class="col-md-3 col-6 mb-3 mb-md-0"><h6 class="text-muted">Total Item (SKU)</h6><h4 class="fw-bold" id="summary-total-item">0</h4></div>
+                            <div class="col-md-3 col-6 mb-3 mb-md-0"><h6 class="text-muted">Total Qty Order</h6><h4 class="fw-bold text-primary" id="summary-qty-order">0</h4></div>
+                            <div class="col-md-3 col-6 mb-3 mb-md-0"><h6 class="text-muted">Total Qty Telah Scan</h6><h4 class="fw-bold text-success" id="summary-qty-scanned">0</h4></div>
+                            <div class="col-md-3 col-6"><h6 class="text-muted">Total Sisa Belum Scan</h6><h4 class="fw-bold text-danger" id="summary-sisa">0</h4></div>
                         </div>
                     </div>
                 </div>
 
                 {{-- Tabel Rincian Item --}}
-                <div class="card mt-4">
-                    <div class="card-header bg-warning"><h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Rincian Item (Picking List)</h5></div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0 table-item-info">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th class="text-center">No.</th>
-                                        <th>Material</th>
-                                        <th>Deskripsi</th>
-                                        <th class="text-center">DO</th>
-                                        <th class="text-center">Item</th>
-                                        <th class="text-center">Batch / HU</th>
-                                        <th class="text-center">Qty Order</th>
-                                        <th class="text-center">Qty Scan</th>
-                                        <th class="text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="picking-list-body"></tbody>
-                            </table>
+                <div class="card mt-3">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Rincian Item (Picking List)</h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="filter-input-group mb-3">
+                             <i class="fas fa-filter"></i>
+                            <input type="text" id="item-filter-input" class="form-control" placeholder="Ketik untuk memfilter item...">
                         </div>
                     </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-item-info">
+                            <thead>
+                                <tr>
+                                    <th style="width: 5%;" class="text-center">No.</th>
+                                    <th style="width: 30%;">Material</th>
+                                    <th style="width: 10%;" class="text-center">DO</th>
+                                    <th style="width: 10%;" class="text-center">Item</th>
+                                    <th style="width: 15%;" class="text-center">Batch / HU</th>
+                                    <th style="width: 10%;" class="text-center">Qty Order</th>
+                                    <th style="width: 20%;" class="text-center">Progress Scan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="picking-list-body"></tbody>
+                        </table>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -240,17 +358,7 @@
 
 {{-- Modal Kamera --}}
 <div class="modal fade" id="cameraScannerModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Arahkan Kamera ke Barcode/QR Code</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div id="reader" width="100%"></div>
-      </div>
-    </div>
-  </div>
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Arahkan Kamera ke Barcode/QR Code</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="reader" width="100%"></div></div></div></div>
 </div>
 @endsection
 
@@ -260,47 +368,52 @@
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Variabel Global ---
     const doNumberInput = document.getElementById('do_number');
     const btnSearchDO = document.getElementById('btn-search-do');
     const pickingListBody = document.getElementById('picking-list-body');
     const doDetailsSection = document.getElementById('do-details');
     const loader = document.getElementById('loader');
     const scanInput = document.getElementById('scan-verification-input');
+    const filterInput = document.getElementById('item-filter-input');
 
-    // --- Variabel untuk Kamera ---
     const btnCameraScan = document.getElementById('btn-camera-scan');
     const cameraScannerModal = new bootstrap.Modal(document.getElementById('cameraScannerModal'));
     let html5QrcodeScanner;
-    let isScanCooldown = false; // Flag untuk jeda scan kamera
+    let isScanCooldown = false;
 
     let currentDOData = null;
     let scannedHUs = new Set();
 
-    // --- Cek sessionStorage saat halaman dimuat ---
     const lastDO = sessionStorage.getItem('lastSearchedDO');
     if (lastDO) {
         doNumberInput.value = lastDO;
-        searchDO(); // Secara otomatis memicu pencarian
+        searchDO();
     }
 
     function showAlert(title, text, icon) {
         Swal.fire({ title, text, icon, timer: 1500, showConfirmButton: false });
     }
 
-    // --- FUNGSI UTAMA ---
-    function searchDO() {
+    async function searchDO() {
         const doNumber = doNumberInput.value.trim();
-        if (!doNumber) { return; }
+        if (!doNumber) return;
         loader.style.display = 'block';
 
-        fetch('{{ route("do.verify.search") }}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-            body: JSON.stringify({ do_number: doNumber })
-        })
-        .then(response => response.json())
-        .then(data => {
+        try {
+            const searchUrl = '{{ route("do.verify.search") }}';
+            const response = await fetch(searchUrl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                body: JSON.stringify({ do_number: doNumber })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                const errorMessage = errorData?.message || `Server merespons dengan status ${response.status}`;
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
             if (data.success) {
                 currentDOData = data.data;
                 displayDODetails();
@@ -311,15 +424,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 doDetailsSection.classList.add('d-none');
                 sessionStorage.removeItem('lastSearchedDO');
             }
-        })
-        .finally(() => {
+        } catch (error) {
+            console.error('Terjadi kesalahan saat mencari DO:', error);
+            showAlert('Error', 'Gagal terhubung ke server. Periksa konsol untuk detail.', 'error');
+        } finally {
             loader.style.display = 'none';
-        });
+        }
     }
 
     function displayDODetails() {
         if (!currentDOData) return;
-
         const savedProgress = currentDOData.progress;
         scannedHUs = new Set(savedProgress.hus || []);
 
@@ -328,121 +442,121 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('shipping-point').textContent = currentDOData.shipping_point || 'T/A';
         document.getElementById('ship-to').textContent = currentDOData.ship_to || 'T/A';
         document.getElementById('ship-type').textContent = currentDOData.ship_type || 'T/A';
+        document.getElementById('container-no').textContent = currentDOData.container_no || 'T/A';
 
         pickingListBody.innerHTML = '';
         currentDOData.items.forEach((item, index) => {
-            const detailsId = `details-item-${index}`;
-            let detailsHtml = '';
-            let batchHuCellHtml = '';
             const savedScanCount = savedProgress.counts[item.material] || 0;
 
-            if (item.is_hu) {
-                batchHuCellHtml = `<span class="hu-count-badge">${item.hu_details.length} HU<i class="info-icon" data-bs-target="#${detailsId}">i</i></span>`;
+            let batchHuCellHtml = item.is_hu ? `${item.hu_details.length} HU` : item.batch_no;
+            let detailRowsHtml = '';
 
-                // PERBAIKAN: Buat tabel detail dengan status
-                let detailRows = item.hu_details.map(detail => {
+            if (item.is_hu) {
+                detailRowsHtml = item.hu_details.map(detail => {
                     const isScanned = scannedHUs.has(detail.hu_no);
-                    const rowClass = isScanned ? 'hu-scanned' : '';
-                    const statusIcon = isScanned ? '<i class="fas fa-check-circle scan-status-icon"></i>' : '';
-                    return `<tr class="${rowClass}">
+                    return `<tr class="${isScanned ? 'hu-scanned' : ''}">
+                                <td>${detail.delivery}</td>
+                                <td>${detail.item}</td>
                                 <td>${detail.hu_no}</td>
-                                <td>${detail.batch_no}</td>
-                                <td>${detail.do_no}</td>
-                                <td>${detail.item_no}</td>
-                                <td class="text-center">${statusIcon}</td>
+                                <td>${detail.item_hu}</td>
+                                <td>${detail.charg2}</td>
+                                <td class="text-center">${detail.qty_hu}</td>
+                                <td class="text-center">${isScanned ? '<i class="fas fa-check-circle text-success scan-status-icon"></i>' : ''}</td>
                             </tr>`;
                 }).join('');
-
-                detailsHtml = `
-                    <tr class="details-row collapse" id="${detailsId}">
-                        <td colspan="9">
-                            <div class="details-table-wrapper">
-                                <h6 class="mb-2">Rincian Handling Units (HU)</h6>
-                                <table class="table table-bordered table-sm details-table">
-                                    <thead>
-                                        <tr>
-                                            <th>HU Number</th>
-                                            <th>Batch Number</th>
-                                            <th>DO</th>
-                                            <th>Item</th>
-                                            <th class="text-center">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${detailRows}</tbody>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>`;
-            } else {
-                batchHuCellHtml = `<span>${item.batch_no}</span>`;
-            }
-
-            let initialStatusClass = 'bg-secondary';
-            let initialStatusText = 'Belum Diverifikasi';
-            if (savedScanCount > 0) {
-                if (savedScanCount >= item.qty_order) {
-                    initialStatusClass = 'bg-success';
-                    initialStatusText = 'Lengkap';
-                } else {
-                    initialStatusClass = 'bg-warning';
-                    initialStatusText = 'Kurang';
-                }
             }
 
             const mainRowClass = item.is_hu ? 'main-item-row has-details' : 'main-item-row';
-            const mainRowHtml = `<tr class="${mainRowClass}" id="main-row-${index}"><td class="text-center">${index + 1}</td><td><strong>${item.material}</strong></td><td>${item.description}</td><td class="text-center">${item.do_no}</td><td class="text-center">${item.item_no}</td><td class="hu-batch-cell">${batchHuCellHtml}</td><td class="text-center">${item.qty_order}</td><td class="text-center" id="scancount-${item.material}">${savedScanCount}</td><td class="text-center" id="status-${item.material}"><span class="badge ${initialStatusClass}">${initialStatusText}</span></td></tr>`;
+            const mainRowHtml = `
+                <tr class="${mainRowClass}" id="main-row-${index}">
+                    <td class="text-center">${index + 1}</td>
+                    <td class="material-cell">
+                        <strong>${item.material}</strong><br>
+                        <span>${item.description}</span>
+                    </td>
+                    <td class="text-center">${item.do_no}</td>
+                    <td class="text-center">${item.item_no}</td>
+                    <td class="text-center">${batchHuCellHtml}</td>
+                    <td class="text-center fw-bold">${item.qty_order}</td>
+                    <td>
+                        <!-- --- PERBAIKAN: Struktur HTML Progress Bar --- -->
+                        <div class="progress-container">
+                             <div class="progress-bar-scan" id="progressbar-${item.material}"></div>
+                             <div class="progress-text" id="progresstext-${item.material}">${savedScanCount} / ${item.qty_order}</div>
+                        </div>
+                    </td>
+                </tr>`;
+
+            const detailsHtml = item.is_hu ? `
+                <tr class="details-row" style="display: none;">
+                    <td colspan="7">
+                        <div class="details-table-wrapper">
+                            <h6 class="mb-3">Rincian Handling Units (HU) untuk ${item.material}</h6>
+                            <table class="table table-bordered table-sm details-table">
+                                <thead>
+                                    <tr>
+                                    <th>Delivery</th>
+                                    <th>Item</th>
+                                    <th>HU Number</th>
+                                    <th>Item HU</th>
+                                    <th>Batch</th>
+                                    <th class="text-center">Qty HU</th>
+                                    <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${detailRowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>` : '';
 
             pickingListBody.innerHTML += mainRowHtml + detailsHtml;
+            updateProgressBarColor(item.material, savedScanCount, item.qty_order);
         });
-
-        document.querySelectorAll('.info-icon').forEach(icon => {
-            icon.addEventListener('click', function (event) {
-                event.stopPropagation();
-                const targetId = this.getAttribute('data-bs-target');
-                if (targetId) {
-                    const targetElement = document.querySelector(targetId);
-                    if (targetElement) {
-                        bootstrap.Collapse.getOrCreateInstance(targetElement).toggle();
-                    }
-                }
-            });
-        });
-
-        document.querySelectorAll('.details-row.collapse').forEach(detailsRow => {
-            const mainRowId = `main-row-${detailsRow.id.split('-').pop()}`;
-            const mainRow = document.getElementById(mainRowId);
-            if (mainRow) {
-                detailsRow.addEventListener('show.bs.collapse', () => mainRow.classList.add('expanded'));
-                detailsRow.addEventListener('hide.bs.collapse', () => mainRow.classList.remove('expanded'));
-            }
-        });
-
         updateSummary();
+    }
+
+    function updateProgressBarColor(material, currentScan, qtyOrder) {
+        const progressBar = document.getElementById(`progressbar-${material}`);
+        if (!progressBar) return;
+
+        const progressPercent = qtyOrder > 0 ? (currentScan / qtyOrder) * 100 : 0;
+        progressBar.style.width = `${progressPercent}%`;
+
+        progressBar.classList.remove('in-process', 'complete');
+
+        if (currentScan >= qtyOrder && qtyOrder > 0) {
+            progressBar.classList.add('complete');
+        } else if (currentScan > 0) {
+            progressBar.classList.add('in-process');
+        }
     }
 
     function processScannedBarcode(barcode) {
         if (!currentDOData) return;
+        const originalBarcode = barcode.trim();
+        const code = /^[0-9]+$/.test(originalBarcode) ? originalBarcode.replace(/^0+/, '') : originalBarcode;
 
-        const code = barcode.trim();
-        let foundItem = null;
-        let isHUscan = false;
-        let batchNumber = null;
+        let foundItem = null; let isHUscan = false; let batchNumber = null;
 
         for (const item of currentDOData.items) {
             if (item.is_hu) {
-                const foundHU = item.hu_details.find(detail => detail.hu_no === code);
+                const foundHU = item.hu_details.find(d => d.hu_no === code);
                 if (foundHU) {
                     foundItem = item;
                     isHUscan = true;
-                    batchNumber = foundHU.batch_no;
+                    batchNumber = foundHU.charg2;
                     break;
                 }
             }
-            if (!item.is_hu && item.material === code) {
-                foundItem = item;
-                isHUscan = false;
-                batchNumber = item.batch_no;
-                break;
+             if (!item.is_hu) {
+                const materialToCheck = /^[0-9]+$/.test(item.material) ? item.material.replace(/^0+/, '') : item.material;
+                if(materialToCheck === code) {
+                    foundItem = item;
+                    isHUscan = false;
+                    batchNumber = item.batch_no;
+                    break;
+                }
             }
         }
 
@@ -452,62 +566,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (foundItem) {
-            const qtyOrder = foundItem.qty_order;
-            const scanCountEl = document.getElementById(`scancount-${foundItem.material}`);
-            let currentScan = parseInt(scanCountEl.textContent, 10);
+            const scanTextEl = document.getElementById(`progresstext-${foundItem.material}`);
+            let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
             if (currentScan < qtyOrder) {
                 currentScan++;
-                scanCountEl.textContent = currentScan;
-
                 if (isHUscan) {
                     scannedHUs.add(code);
                 }
 
                 showAlert('Berhasil!', `Item ${foundItem.material} discan.`, 'success');
-
                 saveScanToDatabase({
-                    do_number: foundItem.do_no,
-                    item_number: foundItem.item_no,
+                    do_number: currentDOData.do_number,
                     material_number: foundItem.material,
-                    scanned_code: code,
-                    batch_number: batchNumber
+                    scanned_code: originalBarcode,
+                    batch_number: batchNumber,
+                    item_number: foundItem.item_no
                 });
 
-                const statusEl = document.getElementById(`status-${foundItem.material}`).querySelector('.badge');
-                if (currentScan === qtyOrder) {
-                    statusEl.textContent = 'Lengkap';
-                    statusEl.className = 'badge bg-success';
-                } else {
-                    statusEl.textContent = 'Kurang';
-                    statusEl.className = 'badge bg-warning';
-                }
+                scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
+                updateProgressBarColor(foundItem.material, currentScan, qtyOrder);
 
                 updateSummary();
-                // PERBAIKAN: Panggil fungsi untuk update tampilan detail HU setelah scan
-                updateHUDetailView();
+                if(isHUscan) updateHUDetailView();
             } else {
                 showAlert('Penuh!', `Item ${foundItem.material} sudah memenuhi kuantitas.`, 'warning');
             }
         } else {
-            showAlert('Gagal!', `Kode "${code}" tidak ditemukan di DO ini.`, 'error');
+            showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di DO ini.`, 'error');
         }
     }
 
-    // PERBAIKAN: Fungsi baru untuk update tampilan detail HU
     function updateHUDetailView() {
         document.querySelectorAll('.details-table tbody tr').forEach(row => {
-            const huNumberCell = row.cells[0];
+            const huNumberCell = row.cells[2];
             if (huNumberCell && scannedHUs.has(huNumberCell.textContent)) {
                 row.classList.add('hu-scanned');
-                const statusCell = row.cells[4]; // Kolom status (indeks ke-4)
-                if (statusCell && !statusCell.querySelector('.scan-status-icon')) {
-                    statusCell.innerHTML = '<i class="fas fa-check-circle scan-status-icon"></i>';
+                const statusCell = row.cells[6];
+                if (statusCell && !statusCell.querySelector('.fa-check-circle')) {
+                    statusCell.innerHTML = '<i class="fas fa-check-circle text-success scan-status-icon"></i>';
                 }
             }
         });
     }
-
 
     async function saveScanToDatabase(scanData) {
         try {
@@ -516,31 +617,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify(scanData)
             });
-        } catch (error) {
-            console.error('Gagal menyimpan scan ke database:', error);
-            showAlert('Offline', 'Gagal menyimpan scan, periksa koneksi.', 'error');
-        }
+        } catch (error) { console.error('Gagal menyimpan scan ke DB:', error); }
     }
 
     function updateSummary() {
-        if (!currentDOData) return;
-        let totalOrder = 0;
-        let totalScanned = 0;
-        const totalItems = currentDOData.items.length;
-
+        let totalOrder = 0; let totalScanned = 0;
         currentDOData.items.forEach(item => {
             totalOrder += item.qty_order;
-            const scanCountEl = document.getElementById(`scancount-${item.material}`);
-            if (scanCountEl) {
-                totalScanned += parseInt(scanCountEl.textContent, 10);
-            }
+            const textContent = document.getElementById(`progresstext-${item.material}`).textContent;
+            const scanned = parseInt(textContent.split(' / ')[0], 10) || 0;
+            totalScanned += scanned;
         });
 
-        const sisa = totalOrder - totalScanned;
-        document.getElementById('summary-total-item').textContent = totalItems;
+        document.getElementById('summary-total-item').textContent = currentDOData.items.length;
         document.getElementById('summary-qty-order').textContent = totalOrder;
         document.getElementById('summary-qty-scanned').textContent = totalScanned;
-        document.getElementById('summary-sisa').textContent = sisa;
+        document.getElementById('summary-sisa').textContent = totalOrder - totalScanned;
+    }
+
+    function isNumeric(str) {
+        if (typeof str != "string") return false
+        return !isNaN(str) && !isNaN(parseFloat(str))
     }
 
     // --- EVENT LISTENERS ---
@@ -550,24 +647,48 @@ document.addEventListener('DOMContentLoaded', function() {
     scanInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             const code = this.value.trim();
-            if (code) {
-                processScannedBarcode(code);
-                this.value = '';
-            }
+            if (code) { processScannedBarcode(code); this.value = ''; }
         }
     });
 
-    // --- LOGIKA UNTUK KAMERA ---
-    btnCameraScan.addEventListener('click', () => {
-        cameraScannerModal.show();
+    pickingListBody.addEventListener('click', function(event) {
+        const mainRow = event.target.closest('.main-item-row.has-details');
+        if (!mainRow) return;
+
+        const detailsRow = mainRow.nextElementSibling;
+
+        if (detailsRow && detailsRow.classList.contains('details-row')) {
+            mainRow.classList.toggle('expanded');
+            detailsRow.style.display = detailsRow.style.display === 'none' ? 'table-row' : 'none';
+        }
     });
 
+    filterInput.addEventListener('keyup', function() {
+        const filterText = this.value.toLowerCase();
+        document.querySelectorAll('#picking-list-body .main-item-row').forEach(row => {
+            const rowText = row.querySelector('.material-cell').textContent.toLowerCase();
+            const detailsRow = row.nextElementSibling;
+
+            if (rowText.includes(filterText)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+                 if (detailsRow && detailsRow.classList.contains('details-row')) {
+                    row.classList.remove('expanded');
+                    detailsRow.style.display = 'none';
+                }
+            }
+        });
+    });
+
+    // --- LOGIKA KAMERA ---
+    btnCameraScan.addEventListener('click', () => cameraScannerModal.show());
+
     document.getElementById('cameraScannerModal').addEventListener('shown.bs.modal', function () {
-        if (!html5QrcodeScanner || !html5QrcodeScanner.isScanning) {
+        if (!html5QrcodeScanner || (html5QrcodeScanner && !html5QrcodeScanner.isScanning)) {
             html5QrcodeScanner = new Html5Qrcode("reader");
             const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
-                .catch(err => console.error("Gagal memulai scanner", err));
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, ()=>{});
         }
     });
 
@@ -578,13 +699,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function onScanSuccess(decodedText, decodedResult) {
-        if (isScanCooldown) { return; }
-        processScannedBarcode(decodedText);
+        if (isScanCooldown) return;
         isScanCooldown = true;
-        setTimeout(() => { isScanCooldown = false; }, 3000); // Jeda 3 detik
+        processScannedBarcode(decodedText);
+        if (window.navigator.vibrate) { window.navigator.vibrate(100); }
+        setTimeout(() => { isScanCooldown = false; }, 2000);
     }
-
-    function onScanFailure(error) { /* Abaikan error */ }
 });
 </script>
 @endpush

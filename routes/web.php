@@ -3,14 +3,30 @@
 use App\Http\Controllers\DeliveryOrderController;
 use Illuminate\Support\Facades\Route;
 
-// Rute untuk menampilkan halaman verifikasi
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Di sini Anda dapat mendaftarkan rute web untuk aplikasi Anda. Rute-rute
+| ini dimuat oleh RouteServiceProvider dan semuanya akan
+| ditetapkan ke grup middleware "web". Buat sesuatu yang hebat!
+|
+*/
+
+// Rute untuk menampilkan halaman verifikasi utama
 Route::get('/delivery-order/verify', [DeliveryOrderController::class, 'verifyIndex'])->name('do.verify.index');
 
-// Rute untuk MENCARI DO dari SAP dan memuat progres (AJAX)
-Route::post('/delivery-order/verify', [DeliveryOrderController::class, 'searchDO'])->name('do.verify.search');
+// --- PERBAIKAN ---
+// URL dan nama method disesuaikan agar cocok dengan frontend (JavaScript) dan Controller.
+// Sebelumnya: Route::post('/delivery-order/verify', [DeliveryOrderController::class, 'searchDO'])
+Route::post('/delivery-order/search', [DeliveryOrderController::class, 'search'])->name('do.verify.search');
 
-// Rute untuk MENYIMPAN setiap item yang berhasil di-scan (AJAX)
-Route::post('/delivery-order/scan', [DeliveryOrderController::class, 'saveScan'])->name('do.verify.scan');
+// --- PERBAIKAN ---
+// Nama method 'saveScan' diubah menjadi 'scan' agar sesuai dengan yang ada di Controller.
+// Sebelumnya: Route::post('/delivery-order/scan', [DeliveryOrderController::class, 'saveScan'])
+Route::post('/delivery-order/scan', [DeliveryOrderController::class, 'scan'])->name('do.verify.scan');
 
-// Rute untuk MENYIMPAN verifikasi yang sudah selesai ke DB (AJAX)
-Route::post('/delivery-order/complete', [DeliveryOrderController::class, 'completeAndSaveVerification'])->name('do.verify.complete');
+// Catatan: Rute ini dinonaktifkan sementara karena method 'completeAndSaveVerification' tidak ditemukan di Controller.
+// Anda bisa mengaktifkannya kembali jika sudah membuat method tersebut.
+// Route::post('/delivery-order/complete', [DeliveryOrderController::class, 'completeAndSaveVerification'])->name('do.verify.complete');
