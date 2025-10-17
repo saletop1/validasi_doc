@@ -32,6 +32,9 @@
         color: white;
         padding: 1.5rem;
         text-align: center;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     .card-footer-custom {
@@ -60,12 +63,17 @@
     .company-info {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         margin-bottom: 1rem;
         padding-bottom: 1rem;
         border-bottom: 1px solid var(--border-color);
     }
+    .company-info-left {
+        display: flex;
+        align-items: center;
+    }
     .company-info img {
-        max-height: 50px;
+        max-height: 65px;
         margin-right: 1.5rem;
     }
     .company-details h5 {
@@ -78,6 +86,13 @@
         color: var(--secondary-color);
         font-size: 0.9rem;
     }
+
+    .do-number-header {
+        font-size: 2.0rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+
     .shipping-details .row > div {
         margin-bottom: 0.5rem;
     }
@@ -183,7 +198,6 @@
         background-color: var(--success-color);
     }
 
-    /* --- PERBAIKAN: Gaya teks di dalam progress bar --- */
     .progress-text {
         position: absolute;
         width: 100%;
@@ -239,9 +253,9 @@
     <div class="card main-card">
         <div class="card-header card-header-custom">
             <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan Delivery Order (DO)</h2>
+            <a href="{{ route('do.history.index') }}" class="btn btn-light"><i class="fas fa-history me-2"></i>Lihat Riwayat</a>
         </div>
         <div class="card-body p-4 p-md-5">
-            {{-- Bagian Input & Cari DO --}}
             <div class="row justify-content-center mb-4">
                 <div class="col-lg-8 col-md-10">
                     <div class="form-group">
@@ -260,11 +274,16 @@
                 <div class="row mb-4">
                     <div class="col-lg-7 mb-4 mb-lg-0">
                         <div class="shipping-header-card">
-                            <div class="company-info">
-                                <img src="{{ asset('images/KMI.png') }}" alt="Logo KMI">
-                                <div class="company-details">
-                                    <h5>PT. KAYU MEBEL INDONESIA</h5>
-                                    <p>Jl. Jend. Urip Sumoharjo No.134, Semarang</p>
+                             <div class="company-info">
+                                <div class="company-info-left">
+                                    <img src="{{ asset('images/KMI.png') }}" alt="Logo KMI">
+                                    <div class="company-details">
+                                        <h5>PT. KAYU MEBEL INDONESIA</h5>
+                                        <p>Jl. Jend. Urip Sumoharjo No.134, Semarang</p>
+                                    </div>
+                                </div>
+                                <div class="do-number-header">
+                                    <span id="header-do-number"></span>
                                 </div>
                             </div>
                             <div class="shipping-details">
@@ -307,7 +326,6 @@
                     </div>
                 </div>
 
-                {{-- Kartu Ringkasan --}}
                 <div class="card mt-3 summary-card">
                     <div class="card-header bg-light"><h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ringkasan Verifikasi</h5></div>
                     <div class="card-body">
@@ -320,7 +338,6 @@
                     </div>
                 </div>
 
-                {{-- Tabel Rincian Item --}}
                 <div class="card mt-3">
                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Rincian Item (Picking List)</h5>
@@ -356,7 +373,6 @@
     </div>
 </div>
 
-{{-- Modal Kamera --}}
 <div class="modal fade" id="cameraScannerModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Arahkan Kamera ke Barcode/QR Code</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="reader" width="100%"></div></div></div></div>
 </div>
@@ -383,6 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let currentDOData = null;
     let scannedHUs = new Set();
+    let isCompletionNotified = false;
 
     const lastDO = sessionStorage.getItem('lastSearchedDO');
     if (lastDO) {
@@ -390,14 +407,15 @@ document.addEventListener('DOMContentLoaded', function() {
         searchDO();
     }
 
-    function showAlert(title, text, icon) {
-        Swal.fire({ title, text, icon, timer: 1500, showConfirmButton: false });
+    function showAlert(title, text, icon, timer = 1500) {
+        Swal.fire({ title, text, icon, timer: timer, showConfirmButton: false });
     }
 
     async function searchDO() {
         const doNumber = doNumberInput.value.trim();
         if (!doNumber) return;
         loader.style.display = 'block';
+        isCompletionNotified = false;
 
         try {
             const searchUrl = '{{ route("do.verify.search") }}';
@@ -407,18 +425,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ do_number: doNumber })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                const errorMessage = errorData?.message || `Server merespons dengan status ${response.status}`;
-                throw new Error(errorMessage);
-            }
-
             const data = await response.json();
-            if (data.success) {
+
+            if (data.status === 'completed') {
+                showAlert('Informasi', data.message, 'info', 4000);
+                doDetailsSection.classList.add('d-none');
+                sessionStorage.removeItem('lastSearchedDO');
+            } else if (data.success) {
                 currentDOData = data.data;
                 displayDODetails();
                 doDetailsSection.classList.remove('d-none');
                 sessionStorage.setItem('lastSearchedDO', doNumber);
+                doNumberInput.value = '';
             } else {
                 showAlert('Gagal', data.message || 'Data tidak ditemukan.', 'error');
                 doDetailsSection.classList.add('d-none');
@@ -443,10 +461,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('ship-to').textContent = currentDOData.ship_to || 'T/A';
         document.getElementById('ship-type').textContent = currentDOData.ship_type || 'T/A';
         document.getElementById('container-no').textContent = currentDOData.container_no || 'T/A';
+        document.getElementById('header-do-number').textContent = currentDOData.do_number || '';
+
 
         pickingListBody.innerHTML = '';
         currentDOData.items.forEach((item, index) => {
-            const savedScanCount = savedProgress.counts[item.material] || 0;
+            const uniqueId = `${item.material}-${item.item_no}`;
+            const savedScanCount = savedProgress.counts[uniqueId] || 0;
 
             let batchHuCellHtml = item.is_hu ? `${item.hu_details.length} HU` : item.batch_no;
             let detailRowsHtml = '';
@@ -479,10 +500,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="text-center">${batchHuCellHtml}</td>
                     <td class="text-center fw-bold">${item.qty_order}</td>
                     <td>
-                        <!-- --- PERBAIKAN: Struktur HTML Progress Bar --- -->
                         <div class="progress-container">
-                             <div class="progress-bar-scan" id="progressbar-${item.material}"></div>
-                             <div class="progress-text" id="progresstext-${item.material}">${savedScanCount} / ${item.qty_order}</div>
+                             <div class="progress-bar-scan" id="progressbar-${uniqueId}"></div>
+                             <div class="progress-text" id="progresstext-${uniqueId}">${savedScanCount} / ${item.qty_order}</div>
                         </div>
                     </td>
                 </tr>`;
@@ -511,13 +531,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tr>` : '';
 
             pickingListBody.innerHTML += mainRowHtml + detailsHtml;
-            updateProgressBarColor(item.material, savedScanCount, item.qty_order);
+            updateProgressBarColor(uniqueId, savedScanCount, item.qty_order);
         });
         updateSummary();
     }
 
-    function updateProgressBarColor(material, currentScan, qtyOrder) {
-        const progressBar = document.getElementById(`progressbar-${material}`);
+    function updateProgressBarColor(uniqueId, currentScan, qtyOrder) {
+        const progressBar = document.getElementById(`progressbar-${uniqueId}`);
         if (!progressBar) return;
 
         const progressPercent = qtyOrder > 0 ? (currentScan / qtyOrder) * 100 : 0;
@@ -549,14 +569,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     break;
                 }
             }
-             if (!item.is_hu) {
-                const materialToCheck = /^[0-9]+$/.test(item.material) ? item.material.replace(/^0+/, '') : item.material;
-                if(materialToCheck === code) {
-                    foundItem = item;
-                    isHUscan = false;
-                    batchNumber = item.batch_no;
-                    break;
-                }
+            if (!item.is_hu && item.batch_no === code) {
+                foundItem = item;
+                isHUscan = false;
+                batchNumber = item.batch_no;
+                break;
             }
         }
 
@@ -566,7 +583,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (foundItem) {
-            const scanTextEl = document.getElementById(`progresstext-${foundItem.material}`);
+            const uniqueId = `${foundItem.material}-${foundItem.item_no}`;
+            const scanTextEl = document.getElementById(`progresstext-${uniqueId}`);
             let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
             if (currentScan < qtyOrder) {
@@ -579,18 +597,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveScanToDatabase({
                     do_number: currentDOData.do_number,
                     material_number: foundItem.material,
+                    item_number: foundItem.item_no,
                     scanned_code: originalBarcode,
-                    batch_number: batchNumber,
-                    item_number: foundItem.item_no
+                    batch_number: batchNumber
                 });
 
                 scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
-                updateProgressBarColor(foundItem.material, currentScan, qtyOrder);
+                updateProgressBarColor(uniqueId, currentScan, qtyOrder);
 
                 updateSummary();
                 if(isHUscan) updateHUDetailView();
             } else {
-                showAlert('Penuh!', `Item ${foundItem.material} sudah memenuhi kuantitas.`, 'warning');
+                showAlert('Penuh!', `Item ${foundItem.material} (${foundItem.item_no}) sudah memenuhi kuantitas.`, 'warning');
             }
         } else {
             showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di DO ini.`, 'error');
@@ -623,8 +641,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSummary() {
         let totalOrder = 0; let totalScanned = 0;
         currentDOData.items.forEach(item => {
+            const uniqueId = `${item.material}-${item.item_no}`;
             totalOrder += item.qty_order;
-            const textContent = document.getElementById(`progresstext-${item.material}`).textContent;
+            const textContent = document.getElementById(`progresstext-${uniqueId}`).textContent;
             const scanned = parseInt(textContent.split(' / ')[0], 10) || 0;
             totalScanned += scanned;
         });
@@ -633,6 +652,24 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('summary-qty-order').textContent = totalOrder;
         document.getElementById('summary-qty-scanned').textContent = totalScanned;
         document.getElementById('summary-sisa').textContent = totalOrder - totalScanned;
+
+        if (totalOrder > 0 && totalScanned >= totalOrder && !isCompletionNotified) {
+            isCompletionNotified = true;
+            showAlert('Verifikasi Selesai!', 'Semua item telah berhasil diverifikasi. Notifikasi email sedang dikirim.', 'success', 3000);
+            triggerEmailNotification();
+        }
+    }
+
+    async function triggerEmailNotification() {
+        try {
+            await fetch('{{ route("do.verify.complete") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
+                body: JSON.stringify({ do_number: currentDOData.do_number })
+            });
+        } catch(error) {
+            console.error('Gagal memicu pengiriman email:', error);
+        }
     }
 
     function isNumeric(str) {
@@ -708,4 +745,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 @endpush
-

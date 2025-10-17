@@ -48,17 +48,16 @@ def get_do_details():
         logging.info(f"Memanggil RFC Z_FM_YSDR002 untuk DO: {do_number}")
         result = conn.call('Z_FM_YSDR002', P_VBELN=do_number)
 
-        logging.info(f"--- HASIL MENTAH DARI SAP UNTUK DO {do_number} ---")
-        logging.info(result)
-        logging.info("---------------------------------------------")
+        # --- PERBAIKAN: Log mentah dari SAP dihilangkan dari terminal ---
+        # logging.info(f"--- HASIL MENTAH DARI SAP UNTUK DO {do_number} ---")
+        # logging.info(result)
+        # logging.info("---------------------------------------------")
 
         t_data = result.get('T_DATA', [])
         t_data2 = result.get('T_DATA2', [])
 
-        # --- PERBAIKAN LOGIKA ---
-        # Prioritaskan data. Jika T_DATA ada isinya, kita anggap sukses.
         if t_data:
-            logging.info(f"T_DATA ditemukan ({len(t_data)} baris). Mengabaikan kemungkinan 'false error' di RETURN dan melanjutkan proses.")
+            logging.info(f"T_DATA ditemukan ({len(t_data)} baris). Melanjutkan proses.")
             raw_sap_data = {
                 "success": True,
                 "data": {
@@ -68,17 +67,14 @@ def get_do_details():
             }
             return jsonify(raw_sap_data)
 
-        # Jika T_DATA kosong, baru kita periksa tabel RETURN untuk pesan error yang sebenarnya.
         return_msgs = result.get('RETURN', [])
-        # Cari pesan error yang tipenya 'E' atau 'A' DAN isinya tidak kosong.
         error_msg = next((msg.get('MESSAGE') for msg in return_msgs if msg.get('TYPE') in ('E', 'A') and msg.get('MESSAGE', '').strip()), None)
 
         if error_msg:
             logging.error(f"RFC Gagal karena pesan RETURN dari SAP: {error_msg}")
             return jsonify({"success": False, "message": error_msg}), 404
         else:
-            # Jika T_DATA kosong dan tidak ada pesan error, berarti DO tidak ditemukan.
-            logging.warning(f"DO {do_number} tidak memiliki item di T_DATA dan tidak ada pesan error. Mengembalikan 'tidak ditemukan'.")
+            logging.warning(f"DO {do_number} tidak memiliki item di T_DATA. Mengembalikan 'tidak ditemukan'.")
             return jsonify({"success": False, "message": f"DO {do_number} tidak ditemukan atau tidak memiliki item."}), 404
 
     except Exception as e:
@@ -92,3 +88,4 @@ def get_do_details():
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5002, debug=True)
+

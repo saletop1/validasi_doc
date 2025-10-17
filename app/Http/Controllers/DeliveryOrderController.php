@@ -6,32 +6,88 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerificationCompleted;
 use Throwable;
+use Carbon\Carbon;
 
 class DeliveryOrderController extends Controller
 {
-    /**
-     * Menampilkan halaman verifikasi.
-     *
-     * @return \Illuminate\View\View
-     */
     public function verifyIndex()
     {
         return view('delivery-order.verify');
     }
 
+    public function historyIndex()
+    {
+        $completedDos = DB::table('do_list')
+            ->whereNotNull('VERIFIED_AT')
+            ->orderBy('VERIFIED_AT', 'desc')
+            ->get()
+            ->groupBy('VBELN');
+
+        return view('delivery-order.history', ['completedDos' => $completedDos]);
+    }
+
     /**
-     * Mencari Delivery Order, mengambil data dari API, menyimpannya, dan mengembalikannya.
+     * --- PERBAIKAN: Menyederhanakan query untuk mengambil detail riwayat ---
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param string $doNumber
      * @return \Illuminate\Http\JsonResponse
      */
+    public function getScannedItemsForDO($doNumber)
+    {
+        try {
+            // 1. Ambil semua item asli dari DO
+            $doListItems = DB::table('do_list')
+                ->where('VBELN', $doNumber)
+                ->select('MATNR as material_number', 'MAKTX as description', 'POSNR as item_number', 'LFIMG as qty_order')
+                ->orderBy('POSNR', 'asc')
+                ->get();
+
+            // 2. Ambil jumlah item yang sudah discan, dikelompokkan
+            $scannedCounts = DB::table('scanned_items')
+                ->where('do_number', $doNumber)
+                ->select('material_number', 'item_number', DB::raw('COUNT(*) as qty_scan'))
+                ->groupBy('material_number', 'item_number')
+                ->get()
+                ->keyBy(function ($item) {
+                    // Buat kunci unik untuk pencarian cepat
+                    return $item->material_number . '-' . $item->item_number;
+                });
+
+            // 3. Gabungkan kedua data tersebut
+            $results = $doListItems->map(function ($item) use ($scannedCounts) {
+                $item->item_number = ltrim($item->item_number, '0'); // Hapus leading zero
+                $uniqueKey = $item->material_number . '-' . $item->item_number;
+
+                $item->qty_scan = $scannedCounts->has($uniqueKey) ? $scannedCounts->get($uniqueKey)->qty_scan : 0;
+                return $item;
+            });
+
+            return response()->json($results);
+
+        } catch (Throwable $e) {
+            Log::error('Gagal mengambil detail riwayat: ' . $e->getMessage());
+            return response()->json(['error' => 'Gagal memuat data detail.'], 500);
+        }
+    }
+
+
     public function search(Request $request)
     {
         $validated = $request->validate(['do_number' => 'required|string|max:20']);
         $doNumber = $validated['do_number'];
 
-        // 1. Panggil API Python untuk mendapatkan data SAP terbaru
+        $existingDO = DB::table('do_list')->where('VBELN', $doNumber)->first();
+        if ($existingDO && !is_null($existingDO->VERIFIED_AT)) {
+            return response()->json([
+                'success' => false,
+                'status' => 'completed',
+                'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . Carbon::parse($existingDO->VERIFIED_AT)->format('d-m-Y H:i')
+            ], 200);
+        }
+
         try {
             $response = Http::timeout(30)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
                 'username' => env('SAP_USERNAME'),
@@ -54,7 +110,6 @@ class DeliveryOrderController extends Controller
                 return response()->json(['success' => false, 'message' => "Data untuk DO {$doNumber} tidak ditemukan di SAP."], 404);
             }
 
-            // 2. Simpan data yang berhasil didapat ke database lokal
             $this->saveSapDataToLocal($doNumber, $tData, $tData2);
 
         } catch (Throwable $e) {
@@ -62,7 +117,6 @@ class DeliveryOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Tidak dapat terhubung ke server SAP/Python.'], 500);
         }
 
-        // 3. Ambil data dari database lokal untuk ditampilkan
         try {
             $doHeader = DB::table('do_list')
                 ->where('VBELN', $doNumber)
@@ -73,7 +127,6 @@ class DeliveryOrderController extends Controller
                 return response()->json(['success' => false, 'message' => "Delivery Order {$doNumber} tidak ditemukan di database lokal."]);
             }
 
-            // --- PERBAIKAN: Ambil Nomor Kontainer ---
             $containerInfo = DB::table('do_list_details')
                 ->where('DELV', $doNumber)
                 ->whereNotNull('V_NO_CONT')
@@ -123,11 +176,13 @@ class DeliveryOrderController extends Controller
                  return ctype_digit((string)$hu) ? ltrim($hu, '0') : $hu;
             })->all();
 
-            $scannedCounts = $progressData->groupBy('material_number')->mapWithKeys(function ($group, $key) {
-                 $cleanedKey = ctype_digit((string)$key) ? ltrim($key, '0') : $key;
-                return [$cleanedKey => $group->count()];
-            })->all();
-
+            $scannedCounts = $progressData->groupBy(function($item) {
+                $material = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
+                $itemNo = ctype_digit((string)$item->item_number) ? ltrim($item->item_number, '0') : $item->item_number;
+                return $material . '-' . $itemNo;
+            })->mapWithKeys(function ($group, $key) {
+                return [$key => $group->count()];
+            });
 
             $progress = [
                 'hus' => $scannedHus,
@@ -141,7 +196,7 @@ class DeliveryOrderController extends Controller
                 'shipping_point' => $doHeader->shipping_point,
                 'ship_to' => $doHeader->ship_to,
                 'ship_type' => $doHeader->ship_type,
-                'container_no' => $containerInfo->V_NO_CONT ?? null, // Tambahkan nomor kontainer
+                'container_no' => $containerInfo->V_NO_CONT ?? null,
                 'items' => $formattedItems,
                 'progress' => $progress,
             ];
@@ -154,14 +209,6 @@ class DeliveryOrderController extends Controller
         }
     }
 
-    /**
-     * Menyimpan data dari SAP ke database lokal.
-     *
-     * @param  string $doNumber
-     * @param  array  $tData
-     * @param  array  $tData2
-     * @return void
-     */
     private function saveSapDataToLocal(string $doNumber, array $tData, array $tData2): void
     {
         DB::transaction(function () use ($doNumber, $tData, $tData2) {
@@ -225,12 +272,6 @@ class DeliveryOrderController extends Controller
         });
     }
 
-    /**
-     * Menyimpan data hasil scan ke database.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function scan(Request $request)
     {
         try {
@@ -256,6 +297,41 @@ class DeliveryOrderController extends Controller
         } catch (Throwable $e) {
             Log::error('Error saat menyimpan scan: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan data scan.'], 500);
+        }
+    }
+
+    public function sendCompletionEmail(Request $request)
+    {
+        $validated = $request->validate(['do_number' => 'required|string']);
+        $doNumber = $validated['do_number'];
+
+        try {
+            $doHeader = DB::table('do_list')->where('VBELN', $doNumber)->first();
+
+            if ($doHeader) {
+                DB::table('do_list')->where('VBELN', $doNumber)->update(['VERIFIED_AT' => now()]);
+
+                $containerNo = DB::table('do_list_details')->where('DELV', $doNumber)->value('V_NO_CONT');
+
+                $emailData = [
+                    'do_number' => $doNumber,
+                    'customer' => $doHeader->NAME1,
+                    'ship_to' => $doHeader->SHIPTO,
+                    'container_no' => $containerNo ?? 'T/A',
+                ];
+
+                $recipients = explode(',', env('MAIL_RECIPIENTS', 'default@example.com'));
+
+                Mail::to($recipients)->send(new VerificationCompleted($emailData));
+                Log::info("Email notifikasi untuk DO {$doNumber} telah dimasukkan ke dalam antrian.");
+
+                return response()->json(['success' => true, 'message' => 'Permintaan pengiriman email diterima.']);
+            }
+            return response()->json(['success' => false, 'message' => 'Data DO tidak ditemukan.'], 404);
+
+        } catch (Throwable $e) {
+            Log::error("Gagal memicu email untuk DO {$doNumber}: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal memicu pengiriman email.'], 500);
         }
     }
 }
