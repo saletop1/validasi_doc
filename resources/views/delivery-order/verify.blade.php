@@ -248,15 +248,25 @@
 <div id="loader"></div>
 <div class="container-fluid py-4">
     <div class="card main-card">
-        <div class="card-header card-header-custom">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan Delivery Order</h2>
+        <div class="card-header card-header-custom d-flex justify-content-between align-items-center flex-wrap">
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan DO</h2>
+            @auth
+            <div class="d-flex align-items-center mt-2 mt-md-0">
+                <span class="text-white me-3 d-none d-md-inline">Selamat datang, <strong>{{ Auth::user()->name }}</strong></span>
+                <!-- --- PERBAIKAN: Menambahkan ID pada form logout --- -->
+                <form method="POST" action="{{ route('logout') }}" class="d-inline" id="logout-form">
+                    @csrf
+                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-sign-out-alt me-1"></i>Logout</button>
+                </form>
+            </div>
+            @endauth
         </div>
+
         <div class="card-body p-4 p-md-5">
             <div class="row justify-content-center align-items-end mb-4">
-                <!-- --- PERBAIKAN: Layout Tombol Cari dan Riwayat --- -->
                 <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        <label for="do_number" class="form-label fs-5 fw-bold mb-2"></label>
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
@@ -319,7 +329,7 @@
                     <div class="col-lg-5">
                          <div class="info-card bg-info text-white text-center d-flex flex-column justify-content-center">
                              <h4 class="mb-3"><i class="fas fa-qrcode me-2"></i>Scan Verifikasi</h4>
-                             <p class="mb-3">Klik tombol di bawah untuk memindai menggunakan kamera.</p>
+                             <p>Klik tombol di bawah untuk memindai menggunakan kamera.</p>
                              <button class="btn btn-light btn-lg" id="btn-camera-scan"><i class="fas fa-camera me-2"></i>Scan dengan Kamera</button>
                         </div>
                     </div>
@@ -368,7 +378,7 @@
                 </div>
             </div>
         </div>
-        <div class="card-footer text-center text-muted card-footer-custom"><small>&copy; 2025 PT. Kayu Mebel Indonesia</small></div>
+        <div class="card-footer text-center text-muted card-footer-custom"><small>&copy; {{ date('Y') }} PT. Kayu Mebel Indonesia</small></div>
     </div>
 </div>
 
@@ -398,6 +408,14 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentDOData = null;
     let scannedHUs = new Set();
     let isCompletionNotified = false;
+
+    // --- PERBAIKAN: Menambahkan listener untuk membersihkan storage saat logout ---
+    const logoutForm = document.getElementById('logout-form');
+    if (logoutForm) {
+        logoutForm.addEventListener('submit', function() {
+            sessionStorage.removeItem('lastSearchedDO');
+        });
+    }
 
     const lastDO = sessionStorage.getItem('lastSearchedDO');
     if (lastDO) {

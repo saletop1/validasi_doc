@@ -1,25 +1,42 @@
 <?php
 
-use App\Http\Controllers\DeliveryOrderController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DeliveryOrderController;
 
-// Rute untuk menampilkan halaman verifikasi
-Route::get('/', [DeliveryOrderController::class, 'verifyIndex'])->name('do.verify.index');
-Route::get('/delivery-order/verify', [DeliveryOrderController::class, 'verifyIndex'])->name('do.verify.index.alt');
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// --- RUTE UNTUK UMUM (TIDAK PERLU LOGIN) ---
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+
+// Rute untuk menampilkan halaman registrasi
+Route::get('/register', [AuthController::class, 'showRegistrationForm'])->name('register');
+// Rute untuk memproses data dari form registrasi
+Route::post('/register', [AuthController::class, 'register'])->name('register.post');
 
 
-// Rute untuk MENCARI DO dari SAP dan memuat progres (AJAX)
-Route::post('/delivery-order/search', [DeliveryOrderController::class, 'search'])->name('do.verify.search');
+Route::get('/', function () {
+    return redirect()->route('login');
+});
 
-// Rute untuk MENYIMPAN setiap item yang berhasil di-scan (AJAX)
-Route::post('/delivery-order/scan', [DeliveryOrderController::class, 'scan'])->name('do.verify.scan');
 
-// Rute untuk memicu pengiriman email
-Route::post('/delivery-order/complete-verification', [DeliveryOrderController::class, 'sendCompletionEmail'])->name('do.verify.complete');
+// --- RUTE YANG MEMERLUKAN LOGIN ---
+Route::middleware(['auth'])->group(function () {
+    Route::get('/verify', [DeliveryOrderController::class, 'verifyIndex'])->name('do.verify.index');
 
-// Rute untuk halaman riwayat
-Route::get('/delivery-order/history', [DeliveryOrderController::class, 'historyIndex'])->name('do.history.index');
+    Route::post('/delivery-order/search', [DeliveryOrderController::class, 'search'])->name('do.verify.search');
+    Route::post('/delivery-order/scan', [DeliveryOrderController::class, 'scan'])->name('do.verify.scan');
+    Route::post('/delivery-order/complete-verification', [DeliveryOrderController::class, 'sendCompletionEmail'])->name('do.verify.complete');
 
-// --- BARU: Rute untuk mengambil detail riwayat (AJAX) ---
-Route::get('/delivery-order/history/details/{doNumber}', [DeliveryOrderController::class, 'getScannedItemsForDO'])->name('do.history.details');
+    Route::get('/delivery-order/history', [DeliveryOrderController::class, 'historyIndex'])->name('do.history.index');
+    Route::get('/delivery-order/history/details/{doNumber}', [DeliveryOrderController::class, 'getScannedItemsForDO'])->name('do.history.details');
+
+    // Tambahkan rute logout agar bisa digunakan
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
 
