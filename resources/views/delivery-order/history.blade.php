@@ -113,10 +113,11 @@
             </div>
         </div>
         <div id="modal-content-area" class="d-none">
+            <!-- --- PERBAIKAN: Menambahkan area untuk ringkasan --- -->
+            <div id="modal-summary-area" class="mb-3"></div>
             <table class="table table-striped table-sm">
                 <thead>
                     <tr>
-                        <!-- --- PERBAIKAN: Menambahkan kolom No. --- -->
                         <th style="width: 5%;">No.</th>
                         <th>Material</th>
                         <th class="text-center">Qty Order</th>
@@ -146,6 +147,8 @@
         const modalContent = document.getElementById('modal-content-area');
         const modalDoNumber = document.getElementById('modal-do-number');
         const modalTableBody = document.getElementById('modal-scanned-items-body');
+        // --- PERBAIKAN: Mengambil elemen area ringkasan ---
+        const modalSummaryArea = document.getElementById('modal-summary-area');
 
         filterInput.addEventListener('keyup', function() {
             const filterText = this.value.toLowerCase();
@@ -165,17 +168,40 @@
 
             modalDoNumber.textContent = doNumber;
             modalTableBody.innerHTML = '';
+            // --- PERBAIKAN: Mengosongkan area ringkasan ---
+            modalSummaryArea.innerHTML = '';
             modalLoader.classList.remove('d-none');
             modalContent.classList.add('d-none');
 
             try {
-                // Pastikan route ini sesuai dengan yang ada di web.php Anda
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
 
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Gagal mengambil data dari server');
 
-                const items = await response.json();
+                // --- PERBAIKAN: Mengambil data sebagai objek ---
+                const data = await response.json();
+
+                // --- PERBAIKAN: Menampilkan ringkasan ---
+                if (data.summary) {
+                    const summaryHtml = `
+                        <div class="row text-center bg-light py-2 rounded">
+                            <div class="col-6">
+                                <h6 class="text-muted mb-1">TOTAL QTY ORDER</h6>
+                                <h4 class="fw-bold mb-0">${data.summary.total_order}</h4>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-muted mb-1">TOTAL QTY SCAN</h6>
+                                <h4 class="fw-bold text-success mb-0">${data.summary.total_scan}</h4>
+                            </div>
+                        </div>
+                        <hr class="my-3">
+                    `;
+                    modalSummaryArea.innerHTML = summaryHtml;
+                }
+
+                // --- PERBAIKAN: Mengambil array item dari objek data ---
+                const items = data.items;
 
                 if (items.length > 0) {
                     items.forEach(item => {
@@ -183,7 +209,6 @@
                             ? item.material_number.replace(/^0+/, '')
                             : item.material_number;
 
-                        // --- PERBAIKAN: Menambahkan sel untuk nomor urut ---
                         const row = `
                             <tr>
                                 <td>${item.no}</td>
@@ -212,3 +237,4 @@
     });
 </script>
 @endpush
+

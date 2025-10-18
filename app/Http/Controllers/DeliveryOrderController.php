@@ -8,12 +8,15 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCompleted;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Session;
 use Throwable;
 use Carbon\Carbon;
 
 class DeliveryOrderController extends Controller
 {
-    // ... fungsi lain tidak berubah ...
     public function verifyIndex()
     {
         return view('delivery-order.verify');
@@ -30,6 +33,12 @@ class DeliveryOrderController extends Controller
         return view('delivery-order.history', ['completedDos' => $completedDos]);
     }
 
+    /**
+     * --- PERBAIKAN: Menambahkan ringkasan total pada response ---
+     *
+     * @param string $doNumber
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getScannedItemsForDO($doNumber)
     {
         try {
@@ -49,20 +58,32 @@ class DeliveryOrderController extends Controller
                     return $group->count();
                 });
 
-            // --- PERBAIKAN: Menambahkan nomor urut ---
             $results = $doListItems->map(function ($item, $key) use ($scannedCounts) {
                 $materialKey = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
                 $itemKey = ltrim($item->item_number, '0');
                 $uniqueKey = $materialKey . '-' . $itemKey;
 
-                $item->no = $key + 1; // Menambahkan nomor urut
+                $item->no = $key + 1;
                 $item->qty_scan = $scannedCounts->get($uniqueKey, 0);
                 $item->qty_order = (int)$item->qty_order;
 
                 return $item;
             });
 
-            return response()->json($results);
+            // Menghitung ringkasan total
+            $totalOrder = $results->sum('qty_order');
+            $totalScan = $results->sum('qty_scan');
+
+            // Menyiapkan data respons sebagai objek
+            $responsePayload = [
+                'items' => $results,
+                'summary' => [
+                    'total_order' => $totalOrder,
+                    'total_scan' => $totalScan,
+                ]
+            ];
+
+            return response()->json($responsePayload);
 
         } catch (Throwable $e) {
             Log::error('Gagal mengambil detail riwayat: ' . $e->getMessage());
@@ -78,12 +99,10 @@ class DeliveryOrderController extends Controller
 
         $existingDO = DB::table('do_list')->where('VBELN', $doNumber)->first();
         if ($existingDO && !is_null($existingDO->VERIFIED_AT)) {
-            // --- PERBAIKAN: Mengubah zona waktu ke 'Asia/Jakarta' saat menampilkan ---
-            $verifiedAt = Carbon::parse($existingDO->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d-m-Y H:i');
             return response()->json([
                 'success' => false,
                 'status' => 'completed',
-                'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . $verifiedAt
+                'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . Carbon::parse($existingDO->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d-m-Y H:i')
             ], 200);
         }
 
@@ -308,16 +327,12 @@ class DeliveryOrderController extends Controller
             $doHeader = DB::table('do_list')->where('VBELN', $doNumber)->first();
 
             if ($doHeader) {
-                // --- PERBAIKAN DIMULAI DI SINI ---
-                // 1. Hitung total kuantitas pesanan (LFIMG) untuk DO ini.
+                // --- PERBAIKAN: Menambahkan scanned_qty saat verifikasi selesai ---
                 $totalQty = DB::table('do_list')->where('VBELN', $doNumber)->sum('LFIMG');
-
-                // 2. Update VERIFIED_AT dan SCANNED_QTY secara bersamaan.
                 DB::table('do_list')->where('VBELN', $doNumber)->update([
                     'VERIFIED_AT' => now(),
                     'SCANNED_QTY' => $totalQty
                 ]);
-                // --- PERBAIKAN SELESAI ---
 
                 $containerNo = DB::table('do_list_details')->where('DELV', $doNumber)->value('V_NO_CONT');
 
