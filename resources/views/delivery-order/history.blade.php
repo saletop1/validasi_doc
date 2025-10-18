@@ -49,8 +49,43 @@
     .filter-input {
         margin-bottom: 1.5rem;
     }
+    /* --- PERBAIKAN: Mengatur padding modal-body --- */
+    #historyDetailModal .modal-body {
+        padding-top: 0;
+    }
     .modal-body .table {
-        margin-top: 1rem;
+        margin-top: 0;
+    }
+    .summary-box {
+        color: white;
+        border-radius: 0.5rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+    .summary-box h6 {
+        color: rgba(255, 255, 255, 0.85);
+    }
+    .summary-success {
+        background: linear-gradient(135deg, #2E7D32, #388E3C);
+    }
+    .summary-danger {
+        background: linear-gradient(135deg, #C62828, #D32F2F);
+    }
+
+    /* --- PERBAIKAN: Style untuk elemen sticky di dalam modal --- */
+    #modal-summary-area {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background-color: #ffffff; /* Mencegah konten di bawahnya terlihat */
+        padding: 1rem;
+    }
+    #historyDetailModal .table thead th {
+        position: sticky;
+        /* Properti `top` akan diatur oleh JavaScript */
+        z-index: 2;
+        background-color: #ffffff; /* Latar belakang solid agar tidak tembus */
+        box-shadow: inset 0 -2px 0 #dee2e6; /* Garis bawah visual */
     }
 </style>
 @endpush
@@ -113,8 +148,7 @@
             </div>
         </div>
         <div id="modal-content-area" class="d-none">
-            <!-- --- PERBAIKAN: Menambahkan area untuk ringkasan --- -->
-            <div id="modal-summary-area" class="mb-3"></div>
+            <div id="modal-summary-area"></div>
             <table class="table table-striped table-sm">
                 <thead>
                     <tr>
@@ -147,7 +181,6 @@
         const modalContent = document.getElementById('modal-content-area');
         const modalDoNumber = document.getElementById('modal-do-number');
         const modalTableBody = document.getElementById('modal-scanned-items-body');
-        // --- PERBAIKAN: Mengambil elemen area ringkasan ---
         const modalSummaryArea = document.getElementById('modal-summary-area');
 
         filterInput.addEventListener('keyup', function() {
@@ -168,7 +201,6 @@
 
             modalDoNumber.textContent = doNumber;
             modalTableBody.innerHTML = '';
-            // --- PERBAIKAN: Mengosongkan area ringkasan ---
             modalSummaryArea.innerHTML = '';
             modalLoader.classList.remove('d-none');
             modalContent.classList.add('d-none');
@@ -179,28 +211,28 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Gagal mengambil data dari server');
 
-                // --- PERBAIKAN: Mengambil data sebagai objek ---
                 const data = await response.json();
 
-                // --- PERBAIKAN: Menampilkan ringkasan ---
                 if (data.summary) {
+                    const totalOrder = data.summary.total_order;
+                    const totalScan = data.summary.total_scan;
+                    const summaryClass = totalOrder === totalScan ? 'summary-success' : 'summary-danger';
+
                     const summaryHtml = `
-                        <div class="row text-center bg-light py-2 rounded">
+                        <div class="row text-center summary-box ${summaryClass}">
                             <div class="col-6">
-                                <h6 class="text-muted mb-1">TOTAL QTY ORDER</h6>
-                                <h4 class="fw-bold mb-0">${data.summary.total_order}</h4>
+                                <h6>TOTAL QTY ORDER</h6>
+                                <h4 class="fw-bold mb-0">${totalOrder}</h4>
                             </div>
                             <div class="col-6">
-                                <h6 class="text-muted mb-1">TOTAL QTY SCAN</h6>
-                                <h4 class="fw-bold text-success mb-0">${data.summary.total_scan}</h4>
+                                <h6>TOTAL QTY SCAN</h6>
+                                <h4 class="fw-bold mb-0">${totalScan}</h4>
                             </div>
                         </div>
-                        <hr class="my-3">
                     `;
                     modalSummaryArea.innerHTML = summaryHtml;
                 }
 
-                // --- PERBAIKAN: Mengambil array item dari objek data ---
                 const items = data.items;
 
                 if (items.length > 0) {
@@ -232,6 +264,23 @@
             } finally {
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
+
+                // Logika untuk mengatur posisi sticky header tabel
+                const summaryElement = document.getElementById('modal-summary-area');
+                const tableHeaderCells = document.querySelectorAll('#historyDetailModal .table thead th');
+
+                if (tableHeaderCells.length > 0) {
+                    // Gunakan timeout untuk memastikan DOM dirender dan memiliki tinggi yang benar
+                    setTimeout(() => {
+                        let stickyTopOffset = 0;
+                        if (summaryElement && summaryElement.hasChildNodes()) {
+                            stickyTopOffset = summaryElement.offsetHeight;
+                        }
+                        tableHeaderCells.forEach(th => {
+                            th.style.top = `${stickyTopOffset}px`;
+                        });
+                    }, 50);
+                }
             }
         });
     });
