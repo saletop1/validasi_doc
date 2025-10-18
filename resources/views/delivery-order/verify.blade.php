@@ -249,7 +249,7 @@
 <div class="container-fluid py-4">
     <div class="card main-card">
         <div class="card-header card-header-custom d-flex justify-content-between align-items-center flex-wrap">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan DO</h2>
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i>Validasi Document Delivery Order</h2>
             @auth
             <div class="d-flex align-items-center mt-2 mt-md-0">
                 <span class="text-white me-3 d-none d-md-inline">Selamat datang, <strong>{{ Auth::user()->name }}</strong></span>
@@ -266,7 +266,7 @@
             <div class="row justify-content-center align-items-end mb-4">
                 <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2"></label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
