@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCompleted;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Throwable;
-use Carbon\Carbon;
 
 class DeliveryOrderController extends Controller
 {
@@ -24,17 +24,32 @@ class DeliveryOrderController extends Controller
 
     public function historyIndex()
     {
+        // 1. Ambil DO yang sudah selesai
         $completedDos = DB::table('do_list')
             ->whereNotNull('VERIFIED_AT')
             ->orderBy('VERIFIED_AT', 'desc')
             ->get()
             ->groupBy('VBELN');
 
-        return view('delivery-order.history', ['completedDos' => $completedDos]);
+        // 2. Ambil DO yang sedang dalam proses (sudah ada scan tapi belum selesai)
+        $inProgressDos = DB::table('do_list')
+            ->whereNull('VERIFIED_AT')
+            ->whereIn('VBELN', function ($query) {
+                $query->select('do_number')->from('scanned_items')->distinct();
+            })
+            ->orderBy('updated_at', 'desc') // Urutkan berdasarkan aktivitas terakhir
+            ->get()
+            ->groupBy('VBELN');
+
+        // 3. Kirim kedua data ke view
+        return view('delivery-order.history', [
+            'completedDos' => $completedDos,
+            'inProgressDos' => $inProgressDos
+        ]);
     }
 
     /**
-     * --- PERBAIKAN: Menambahkan ringkasan total pada response ---
+     * Mengambil detail item yang sudah discan untuk sebuah DO.
      *
      * @param string $doNumber
      * @return \Illuminate\Http\JsonResponse
@@ -42,12 +57,14 @@ class DeliveryOrderController extends Controller
     public function getScannedItemsForDO($doNumber)
     {
         try {
+            // Ambil semua item asli dari DO
             $doListItems = DB::table('do_list')
                 ->where('VBELN', $doNumber)
                 ->select('MATNR as material_number', 'MAKTX as description', 'POSNR as item_number', 'LFIMG as qty_order')
                 ->orderBy('POSNR', 'asc')
                 ->get();
 
+            // Ambil jumlah item yang sudah discan, dikelompokkan
             $scannedCounts = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
                 ->get()
@@ -58,7 +75,11 @@ class DeliveryOrderController extends Controller
                     return $group->count();
                 });
 
-            $results = $doListItems->map(function ($item, $key) use ($scannedCounts) {
+            $totalOrder = 0;
+            $totalScan = 0;
+
+            // Gabungkan data dan hitung total
+            $results = $doListItems->map(function ($item, $key) use ($scannedCounts, &$totalOrder, &$totalScan) {
                 $materialKey = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
                 $itemKey = ltrim($item->item_number, '0');
                 $uniqueKey = $materialKey . '-' . $itemKey;
@@ -67,23 +88,19 @@ class DeliveryOrderController extends Controller
                 $item->qty_scan = $scannedCounts->get($uniqueKey, 0);
                 $item->qty_order = (int)$item->qty_order;
 
+                $totalOrder += $item->qty_order;
+                $totalScan += $item->qty_scan;
+
                 return $item;
             });
 
-            // Menghitung ringkasan total
-            $totalOrder = $results->sum('qty_order');
-            $totalScan = $results->sum('qty_scan');
-
-            // Menyiapkan data respons sebagai objek
-            $responsePayload = [
+            return response()->json([
                 'items' => $results,
                 'summary' => [
                     'total_order' => $totalOrder,
-                    'total_scan' => $totalScan,
+                    'total_scan' => $totalScan
                 ]
-            ];
-
-            return response()->json($responsePayload);
+            ]);
 
         } catch (Throwable $e) {
             Log::error('Gagal mengambil detail riwayat: ' . $e->getMessage());
@@ -327,9 +344,10 @@ class DeliveryOrderController extends Controller
             $doHeader = DB::table('do_list')->where('VBELN', $doNumber)->first();
 
             if ($doHeader) {
-                // --- PERBAIKAN: Menambahkan scanned_qty saat verifikasi selesai ---
+                // Menghitung total kuantitas order
                 $totalQty = DB::table('do_list')->where('VBELN', $doNumber)->sum('LFIMG');
-                DB::table('do_list')->where('VBELN', $doNumber)->update([
+
+                DB::table('do_list')->where('VBELN', 'like', $doNumber . '%')->update([
                     'VERIFIED_AT' => now(),
                     'SCANNED_QTY' => $totalQty
                 ]);
@@ -358,4 +376,3 @@ class DeliveryOrderController extends Controller
         }
     }
 }
-

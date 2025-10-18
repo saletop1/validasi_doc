@@ -49,7 +49,6 @@
     .filter-input {
         margin-bottom: 1.5rem;
     }
-    /* --- PERBAIKAN: Mengatur padding modal-body --- */
     #historyDetailModal .modal-body {
         padding-top: 0;
     }
@@ -72,20 +71,30 @@
         background: linear-gradient(135deg, #C62828, #D32F2F);
     }
 
-    /* --- PERBAIKAN: Style untuk elemen sticky di dalam modal --- */
     #modal-summary-area {
         position: sticky;
         top: 0;
         z-index: 3;
-        background-color: #ffffff; /* Mencegah konten di bawahnya terlihat */
+        background-color: #ffffff;
         padding: 1rem;
     }
     #historyDetailModal .table thead th {
         position: sticky;
-        /* Properti `top` akan diatur oleh JavaScript */
         z-index: 2;
-        background-color: #ffffff; /* Latar belakang solid agar tidak tembus */
-        box-shadow: inset 0 -2px 0 #dee2e6; /* Garis bawah visual */
+        background-color: #ffffff;
+        box-shadow: inset 0 -2px 0 #dee2e6;
+    }
+    /* Style untuk Tab */
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        border: none;
+        border-bottom: 3px solid transparent;
+    }
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        font-weight: 600;
+        background-color: transparent;
+        border-bottom: 3px solid #0d6efd;
     }
 </style>
 @endpush
@@ -104,31 +113,72 @@
                 </div>
             </div>
 
-            <div id="history-list" class="row">
-                @forelse ($completedDos as $doNumber => $items)
-                    @php
-                        $firstItem = $items->first();
-                    @endphp
-                    <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($doNumber . ' ' . $firstItem->NAME1) }}">
-                        <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $doNumber }}">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <p class="do-number mb-1">{{ $doNumber }}</p>
-                                    <span class="badge bg-success">Selesai</span>
+            <!-- Navigasi Tab -->
+            <ul class="nav nav-tabs mb-4" id="historyTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">Selesai</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="inprogress-tab" data-bs-toggle="tab" data-bs-target="#inprogress-panel" type="button" role="tab" aria-controls="inprogress-panel" aria-selected="false">Dalam Proses</button>
+                </li>
+            </ul>
+
+            <!-- Konten Tab -->
+            <div class="tab-content" id="historyTabContent">
+                <!-- Panel Selesai -->
+                <div class="tab-pane fade show active" id="completed-panel" role="tabpanel" aria-labelledby="completed-tab">
+                    <div class="row history-list">
+                        @forelse ($completedDos as $doNumber => $items)
+                            @php $firstItem = $items->first(); @endphp
+                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($doNumber . ' ' . $firstItem->NAME1) }}">
+                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $doNumber }}">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <p class="do-number mb-1">{{ $doNumber }}</p>
+                                            <span class="badge bg-success">Selesai</span>
+                                        </div>
+                                        <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
+                                        <p class="verification-date mb-0">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            Diverifikasi pada: {{ \Carbon\Carbon::parse($firstItem->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
-                                <p class="verification-date mb-0">
-                                    <i class="fas fa-check-circle me-1"></i>
-                                    Diverifikasi pada: {{ \Carbon\Carbon::parse($firstItem->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
-                                </p>
                             </div>
-                        </div>
+                        @empty
+                            <div class="col-12 text-center">
+                                <p class="text-muted">Belum ada riwayat verifikasi yang selesai.</p>
+                            </div>
+                        @endforelse
                     </div>
-                @empty
-                    <div class="col-12 text-center">
-                        <p class="text-muted">Belum ada riwayat verifikasi yang tersimpan.</p>
+                </div>
+                <!-- Panel Dalam Proses -->
+                <div class="tab-pane fade" id="inprogress-panel" role="tabpanel" aria-labelledby="inprogress-tab">
+                    <div class="row history-list">
+                        @forelse ($inProgressDos as $doNumber => $items)
+                            @php $firstItem = $items->first(); @endphp
+                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($doNumber . ' ' . $firstItem->NAME1) }}">
+                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $doNumber }}">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <p class="do-number mb-1">{{ $doNumber }}</p>
+                                            <span class="badge bg-warning text-dark">Proses</span>
+                                        </div>
+                                        <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
+                                        <p class="verification-date mb-0">
+                                            <i class="fas fa-sync-alt me-1"></i>
+                                            Aktivitas terakhir: {{ \Carbon\Carbon::parse($firstItem->updated_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="col-12 text-center">
+                                <p class="text-muted">Tidak ada verifikasi yang sedang dalam proses.</p>
+                            </div>
+                        @endforelse
                     </div>
-                @endforelse
+                </div>
             </div>
         </div>
     </div>
@@ -172,10 +222,10 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const filterInput = document.getElementById('history-filter');
-        const historyItems = document.querySelectorAll('.history-item');
         const historyDetailModal = document.getElementById('historyDetailModal');
         const modalLoader = document.getElementById('modal-loader');
         const modalContent = document.getElementById('modal-content-area');
@@ -183,8 +233,12 @@
         const modalTableBody = document.getElementById('modal-scanned-items-body');
         const modalSummaryArea = document.getElementById('modal-summary-area');
 
+        // Fungsi filter sekarang berlaku untuk tab yang aktif
         filterInput.addEventListener('keyup', function() {
             const filterText = this.value.toLowerCase();
+            const activeTabPane = document.querySelector('.tab-pane.active');
+            const historyItems = activeTabPane.querySelectorAll('.history-item');
+
             historyItems.forEach(item => {
                 const itemText = item.getAttribute('data-filter-text');
                 if (itemText.includes(filterText)) {
@@ -265,12 +319,10 @@
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
 
-                // Logika untuk mengatur posisi sticky header tabel
                 const summaryElement = document.getElementById('modal-summary-area');
                 const tableHeaderCells = document.querySelectorAll('#historyDetailModal .table thead th');
 
                 if (tableHeaderCells.length > 0) {
-                    // Gunakan timeout untuk memastikan DOM dirender dan memiliki tinggi yang benar
                     setTimeout(() => {
                         let stickyTopOffset = 0;
                         if (summaryElement && summaryElement.hasChildNodes()) {
