@@ -13,6 +13,7 @@ use Carbon\Carbon;
 
 class DeliveryOrderController extends Controller
 {
+    // ... fungsi lain tidak berubah ...
     public function verifyIndex()
     {
         return view('delivery-order.verify');
@@ -29,39 +30,35 @@ class DeliveryOrderController extends Controller
         return view('delivery-order.history', ['completedDos' => $completedDos]);
     }
 
-    /**
-     * --- PERBAIKAN: Menyederhanakan query untuk mengambil detail riwayat ---
-     *
-     * @param string $doNumber
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function getScannedItemsForDO($doNumber)
     {
         try {
-            // 1. Ambil semua item asli dari DO
             $doListItems = DB::table('do_list')
                 ->where('VBELN', $doNumber)
                 ->select('MATNR as material_number', 'MAKTX as description', 'POSNR as item_number', 'LFIMG as qty_order')
                 ->orderBy('POSNR', 'asc')
                 ->get();
 
-            // 2. Ambil jumlah item yang sudah discan, dikelompokkan
             $scannedCounts = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
-                ->select('material_number', 'item_number', DB::raw('COUNT(*) as qty_scan'))
-                ->groupBy('material_number', 'item_number')
                 ->get()
-                ->keyBy(function ($item) {
-                    // Buat kunci unik untuk pencarian cepat
+                ->groupBy(function ($item) {
                     return $item->material_number . '-' . $item->item_number;
+                })
+                ->map(function ($group) {
+                    return $group->count();
                 });
 
-            // 3. Gabungkan kedua data tersebut
-            $results = $doListItems->map(function ($item) use ($scannedCounts) {
-                $item->item_number = ltrim($item->item_number, '0'); // Hapus leading zero
-                $uniqueKey = $item->material_number . '-' . $item->item_number;
+            // --- PERBAIKAN: Menambahkan nomor urut ---
+            $results = $doListItems->map(function ($item, $key) use ($scannedCounts) {
+                $materialKey = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
+                $itemKey = ltrim($item->item_number, '0');
+                $uniqueKey = $materialKey . '-' . $itemKey;
 
-                $item->qty_scan = $scannedCounts->has($uniqueKey) ? $scannedCounts->get($uniqueKey)->qty_scan : 0;
+                $item->no = $key + 1; // Menambahkan nomor urut
+                $item->qty_scan = $scannedCounts->get($uniqueKey, 0);
+                $item->qty_order = (int)$item->qty_order;
+
                 return $item;
             });
 
@@ -81,10 +78,12 @@ class DeliveryOrderController extends Controller
 
         $existingDO = DB::table('do_list')->where('VBELN', $doNumber)->first();
         if ($existingDO && !is_null($existingDO->VERIFIED_AT)) {
+            // --- PERBAIKAN: Mengubah zona waktu ke 'Asia/Jakarta' saat menampilkan ---
+            $verifiedAt = Carbon::parse($existingDO->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d-m-Y H:i');
             return response()->json([
                 'success' => false,
                 'status' => 'completed',
-                'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . Carbon::parse($existingDO->VERIFIED_AT)->format('d-m-Y H:i')
+                'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . $verifiedAt
             ], 200);
         }
 
@@ -309,7 +308,16 @@ class DeliveryOrderController extends Controller
             $doHeader = DB::table('do_list')->where('VBELN', $doNumber)->first();
 
             if ($doHeader) {
-                DB::table('do_list')->where('VBELN', $doNumber)->update(['VERIFIED_AT' => now()]);
+                // --- PERBAIKAN DIMULAI DI SINI ---
+                // 1. Hitung total kuantitas pesanan (LFIMG) untuk DO ini.
+                $totalQty = DB::table('do_list')->where('VBELN', $doNumber)->sum('LFIMG');
+
+                // 2. Update VERIFIED_AT dan SCANNED_QTY secara bersamaan.
+                DB::table('do_list')->where('VBELN', $doNumber)->update([
+                    'VERIFIED_AT' => now(),
+                    'SCANNED_QTY' => $totalQty
+                ]);
+                // --- PERBAIKAN SELESAI ---
 
                 $containerNo = DB::table('do_list_details')->where('DELV', $doNumber)->value('V_NO_CONT');
 
@@ -317,7 +325,7 @@ class DeliveryOrderController extends Controller
                     'do_number' => $doNumber,
                     'customer' => $doHeader->NAME1,
                     'ship_to' => $doHeader->SHIPTO,
-                    'container_no' => $containerNo ?? 'T/A',
+                    'container_no' => $containerNo ?? 'N/A',
                 ];
 
                 $recipients = explode(',', env('MAIL_RECIPIENTS', 'default@example.com'));

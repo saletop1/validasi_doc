@@ -32,9 +32,6 @@
         color: white;
         padding: 1.5rem;
         text-align: center;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
     }
 
     .card-footer-custom {
@@ -252,19 +249,22 @@
 <div class="container-fluid py-4">
     <div class="card main-card">
         <div class="card-header card-header-custom">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan Delivery Order (DO)</h2>
-            <a href="{{ route('do.history.index') }}" class="btn btn-light"><i class="fas fa-history me-2"></i>Lihat Riwayat</a>
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan Delivery Order</h2>
         </div>
         <div class="card-body p-4 p-md-5">
-            <div class="row justify-content-center mb-4">
-                <div class="col-lg-8 col-md-10">
+            <div class="row justify-content-center align-items-end mb-4">
+                <!-- --- PERBAIKAN: Layout Tombol Cari dan Riwayat --- -->
+                <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2"></label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
                         </div>
                     </div>
+                </div>
+                <div class="col-lg-3 col-md-4 text-md-end mt-3 mt-md-0">
+                     <a href="{{ route('do.history.index') }}" class="btn btn-secondary btn-lg w-100"><i class="fas fa-history me-2"></i>Lihat Riwayat</a>
                 </div>
             </div>
 
@@ -319,9 +319,8 @@
                     <div class="col-lg-5">
                          <div class="info-card bg-info text-white text-center d-flex flex-column justify-content-center">
                              <h4 class="mb-3"><i class="fas fa-qrcode me-2"></i>Scan Verifikasi</h4>
-                             <p class="mb-2">Gunakan scanner genggam atau klik tombol kamera.</p>
-                             <input type="text" class="form-control form-control-lg text-center mb-2" id="scan-verification-input" placeholder="Arahkan scanner ke sini...">
-                             <button class="btn btn-light" id="btn-camera-scan"><i class="fas fa-camera me-2"></i>Scan dengan Kamera</button>
+                             <p class="mb-3">Klik tombol di bawah untuk memindai menggunakan kamera.</p>
+                             <button class="btn btn-light btn-lg" id="btn-camera-scan"><i class="fas fa-camera me-2"></i>Scan dengan Kamera</button>
                         </div>
                     </div>
                 </div>
@@ -389,7 +388,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const pickingListBody = document.getElementById('picking-list-body');
     const doDetailsSection = document.getElementById('do-details');
     const loader = document.getElementById('loader');
-    const scanInput = document.getElementById('scan-verification-input');
     const filterInput = document.getElementById('item-filter-input');
 
     const btnCameraScan = document.getElementById('btn-camera-scan');
@@ -681,13 +679,6 @@ document.addEventListener('DOMContentLoaded', function() {
     btnSearchDO.addEventListener('click', searchDO);
     doNumberInput.addEventListener('keypress', (e) => e.key === 'Enter' && searchDO());
 
-    scanInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            const code = this.value.trim();
-            if (code) { processScannedBarcode(code); this.value = ''; }
-        }
-    });
-
     pickingListBody.addEventListener('click', function(event) {
         const mainRow = event.target.closest('.main-item-row.has-details');
         if (!mainRow) return;
@@ -745,3 +736,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 @endpush
+

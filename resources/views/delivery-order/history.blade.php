@@ -84,7 +84,7 @@
                                 <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
                                 <p class="verification-date mb-0">
                                     <i class="fas fa-check-circle me-1"></i>
-                                    Diverifikasi pada: {{ \Carbon\Carbon::parse($firstItem->VERIFIED_AT)->format('d F Y H:i') }}
+                                    Diverifikasi pada: {{ \Carbon\Carbon::parse($firstItem->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
                                 </p>
                             </div>
                         </div>
@@ -113,10 +113,11 @@
             </div>
         </div>
         <div id="modal-content-area" class="d-none">
-            <!-- --- PERBAIKAN: Mengubah header tabel --- -->
             <table class="table table-striped table-sm">
                 <thead>
                     <tr>
+                        <!-- --- PERBAIKAN: Menambahkan kolom No. --- -->
+                        <th style="width: 5%;">No.</th>
                         <th>Material</th>
                         <th class="text-center">Qty Order</th>
                         <th class="text-center">Qty Scan</th>
@@ -168,6 +169,7 @@
             modalContent.classList.add('d-none');
 
             try {
+                // Pastikan route ini sesuai dengan yang ada di web.php Anda
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
 
                 const response = await fetch(url);
@@ -176,12 +178,17 @@
                 const items = await response.json();
 
                 if (items.length > 0) {
-                    // --- PERBAIKAN: Mengubah cara data ditampilkan ---
                     items.forEach(item => {
+                        const materialDisplay = /^[0-9]+$/.test(item.material_number)
+                            ? item.material_number.replace(/^0+/, '')
+                            : item.material_number;
+
+                        // --- PERBAIKAN: Menambahkan sel untuk nomor urut ---
                         const row = `
                             <tr>
+                                <td>${item.no}</td>
                                 <td>
-                                    <strong>${item.material_number}</strong><br>
+                                    <strong>${materialDisplay}</strong><br>
                                     <small>${item.description}</small>
                                 </td>
                                 <td class="text-center">${parseInt(item.qty_order)}</td>
@@ -191,12 +198,12 @@
                         modalTableBody.innerHTML += row;
                     });
                 } else {
-                    modalTableBody.innerHTML = '<tr><td colspan="3" class="text-center">Tidak ada data scan ditemukan.</td></tr>';
+                    modalTableBody.innerHTML = '<tr><td colspan="4" class="text-center">Tidak ada data scan ditemukan.</td></tr>';
                 }
 
             } catch (error) {
                 console.error('Error fetching history details:', error);
-                modalTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Gagal memuat data.</td></tr>';
+                modalTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Gagal memuat data.</td></tr>';
             } finally {
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
@@ -205,4 +212,3 @@
     });
 </script>
 @endpush
-
