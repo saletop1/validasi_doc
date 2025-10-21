@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCompleted;
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\Carbon; // --- PERBAIKAN: Memastikan Carbon diimpor dengan benar ---
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
@@ -119,6 +119,7 @@ class DeliveryOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'status' => 'completed',
+                // --- PERBAIKAN: Menggunakan Carbon setelah di-import ---
                 'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . Carbon::parse($existingDO->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d-m-Y H:i')
             ], 200);
         }
@@ -376,3 +377,4 @@ class DeliveryOrderController extends Controller
         }
     }
 }
+
