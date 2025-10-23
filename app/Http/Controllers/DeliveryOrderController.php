@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCompleted;
-use App\Models\User;
-use Carbon\Carbon; // --- PERBAIKAN: Memastikan Carbon diimpor dengan benar ---
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Session;
+// use App\Models\User;
+use Carbon\Carbon;
+// use Illuminate\Support\Facades\Auth;
+// use Illuminate\Support\Facades\Hash;
+// use Illuminate\Support\Facades\Session;
 use Throwable;
 
 class DeliveryOrderController extends Controller
@@ -125,9 +125,9 @@ class DeliveryOrderController extends Controller
         }
 
         try {
-            $response = Http::timeout(30)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
-                'username' => env('SAP_USERNAME'),
-                'password' => env('SAP_PASSWORD'),
+            $response = Http::timeout(20)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
+                'username' => "auto_email",
+                'password' => "11223344",
                 'P_VBELN' => $doNumber,
             ]);
 
@@ -364,7 +364,7 @@ class DeliveryOrderController extends Controller
 
                 $recipients = explode(',', env('MAIL_RECIPIENTS', 'default@example.com'));
 
-                Mail::to($recipients)->send(new VerificationCompleted($emailData));
+                // Mail::to($recipients)->send(new VerificationCompleted($emailData));
                 Log::info("Email notifikasi untuk DO {$doNumber} telah dimasukkan ke dalam antrian.");
 
                 return response()->json(['success' => true, 'message' => 'Permintaan pengiriman email diterima.']);

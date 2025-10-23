@@ -249,11 +249,10 @@
 <div class="container-fluid py-4">
     <div class="card main-card">
         <div class="card-header card-header-custom d-flex justify-content-between align-items-center flex-wrap">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i>Validasi Document Delivery Order</h2>
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan DO</h2>
             @auth
             <div class="d-flex align-items-center mt-2 mt-md-0">
                 <span class="text-white me-3 d-none d-md-inline">Selamat datang, <strong>{{ Auth::user()->name }}</strong></span>
-                <!-- --- PERBAIKAN: Menambahkan ID pada form logout --- -->
                 <form method="POST" action="{{ route('logout') }}" class="d-inline" id="logout-form">
                     @csrf
                     <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-sign-out-alt me-1"></i>Logout</button>
@@ -266,7 +265,7 @@
             <div class="row justify-content-center align-items-end mb-4">
                 <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        <label for="do_number" class="form-label fs-5 fw-bold mb-2"></label>
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
@@ -398,10 +397,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const pickingListBody = document.getElementById('picking-list-body');
     const doDetailsSection = document.getElementById('do-details');
     const loader = document.getElementById('loader');
-    const filterInput = document.getElementById('item-filter-input');
+    const filterInput = document.getElementById('item-filter-input'); // Perbaiki ID filter input
 
     const btnCameraScan = document.getElementById('btn-camera-scan');
-    const cameraScannerModal = new bootstrap.Modal(document.getElementById('cameraScannerModal'));
+    const cameraScannerModalElement = document.getElementById('cameraScannerModal'); // Simpan elemen modal
+    const cameraScannerModal = new bootstrap.Modal(cameraScannerModalElement);
     let html5QrcodeScanner;
     let isScanCooldown = false;
 
@@ -409,12 +409,58 @@ document.addEventListener('DOMContentLoaded', function() {
     let scannedHUs = new Set();
     let isCompletionNotified = false;
 
-    // --- PERBAIKAN: Menambahkan listener untuk membersihkan storage saat logout ---
     const logoutForm = document.getElementById('logout-form');
     if (logoutForm) {
         logoutForm.addEventListener('submit', function() {
             sessionStorage.removeItem('lastSearchedDO');
         });
+    }
+
+    // Fungsi fetch dengan Timeout dan Penanganan Error Auth
+    async function fetchWithTimeout(resource, options = {}, timeout = 30000) { // Timeout 30 detik
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+
+        try {
+            const response = await fetch(resource, {
+                ...options,
+                signal: controller.signal
+            });
+
+            clearTimeout(id); // Hapus timer jika fetch berhasil
+
+            // Cek jika sesi habis (dari middleware Authenticate)
+            if (response.status === 401 || response.status === 419) {
+                showAlert('Sesi Habis', 'Sesi Anda telah berakhir. Silakan login kembali.', 'warning', 3000);
+                setTimeout(() => {
+                    window.location.href = "{{ route('login') }}";
+                }, 3000);
+                throw new Error('Unauthenticated'); // Hentikan proses selanjutnya
+            }
+
+            // Cek error server lainnya
+            if (!response.ok) {
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch(e) {
+                    errorData = { message: `HTTP error! status: ${response.status}` };
+                }
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+
+            // Jika respons OK
+            return response;
+
+        } catch (error) {
+            clearTimeout(id); // Pastikan timer dihapus jika ada error
+            if (error.name === 'AbortError') {
+                showAlert('Timeout', 'Permintaan ke server memakan waktu terlalu lama. Silakan coba lagi.', 'error', 3000);
+            } else if (error.message !== 'Unauthenticated') {
+                 showAlert('Error', `Terjadi kesalahan: ${error.message}`, 'error', 3000);
+            }
+            throw error; // Lempar error agar promise di pemanggil ditolak
+        }
     }
 
     const lastDO = sessionStorage.getItem('lastSearchedDO');
@@ -432,10 +478,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!doNumber) return;
         loader.style.display = 'block';
         isCompletionNotified = false;
+        doDetailsSection.classList.add('d-none');
 
         try {
             const searchUrl = '{{ route("do.verify.search") }}';
-            const response = await fetch(searchUrl, {
+            const response = await fetchWithTimeout(searchUrl, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify({ do_number: doNumber })
@@ -445,7 +492,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (data.status === 'completed') {
                 showAlert('Informasi', data.message, 'info', 4000);
-                doDetailsSection.classList.add('d-none');
                 sessionStorage.removeItem('lastSearchedDO');
             } else if (data.success) {
                 currentDOData = data.data;
@@ -455,12 +501,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 doNumberInput.value = '';
             } else {
                 showAlert('Gagal', data.message || 'Data tidak ditemukan.', 'error');
-                doDetailsSection.classList.add('d-none');
                 sessionStorage.removeItem('lastSearchedDO');
             }
         } catch (error) {
-            console.error('Terjadi kesalahan saat mencari DO:', error);
-            showAlert('Error', 'Gagal terhubung ke server. Periksa konsol untuk detail.', 'error');
+            console.error('Gagal mencari DO:', error.message);
+            sessionStorage.removeItem('lastSearchedDO');
         } finally {
             loader.style.display = 'none';
         }
@@ -478,7 +523,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('ship-type').textContent = currentDOData.ship_type || 'T/A';
         document.getElementById('container-no').textContent = currentDOData.container_no || 'T/A';
         document.getElementById('header-do-number').textContent = currentDOData.do_number || '';
-
 
         pickingListBody.innerHTML = '';
         currentDOData.items.forEach((item, index) => {
@@ -517,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="text-center fw-bold">${item.qty_order}</td>
                     <td>
                         <div class="progress-container">
-                             <div class="progress-bar-scan" id="progressbar-${uniqueId}"></div>
+                             <div class="progress-bar-scan" id="progressbar-${uniqueId}" style="width: 0%;"></div>
                              <div class="progress-text" id="progresstext-${uniqueId}">${savedScanCount} / ${item.qty_order}</div>
                         </div>
                     </td>
@@ -550,6 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateProgressBarColor(uniqueId, savedScanCount, item.qty_order);
         });
         updateSummary();
+        updateHUDetailView();
     }
 
     function updateProgressBarColor(uniqueId, currentScan, qtyOrder) {
@@ -573,7 +618,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const originalBarcode = barcode.trim();
         const code = /^[0-9]+$/.test(originalBarcode) ? originalBarcode.replace(/^0+/, '') : originalBarcode;
 
-        let foundItem = null; let isHUscan = false; let batchNumber = null;
+        let foundItem = null;
+        let isHUscan = false;
+        let batchNumber = null;
+        let scanQtyToAdd = 1; // Default jika bukan HU
 
         for (const item of currentDOData.items) {
             if (item.is_hu) {
@@ -582,40 +630,47 @@ document.addEventListener('DOMContentLoaded', function() {
                     foundItem = item;
                     isHUscan = true;
                     batchNumber = foundHU.charg2;
+                    scanQtyToAdd = foundHU.qty_hu; // Gunakan Qty dari HU
                     break;
                 }
             }
+            // Hanya cocokkan batch jika item BUKAN HU
             if (!item.is_hu && item.batch_no === code) {
                 foundItem = item;
                 isHUscan = false;
                 batchNumber = item.batch_no;
+                scanQtyToAdd = 1; // Untuk batch, tambahkan 1
                 break;
             }
         }
 
+        // --- Cek duplikat HANYA untuk HU ---
         if (foundItem && isHUscan && scannedHUs.has(code)) {
             showAlert('Duplikat!', `HU ${code} sudah pernah discan.`, 'warning');
-            return;
+            return; // Hentikan proses jika HU duplikat
         }
+        // --- Akhir Cek Duplikat ---
 
         if (foundItem) {
             const uniqueId = `${foundItem.material}-${foundItem.item_no}`;
             const scanTextEl = document.getElementById(`progresstext-${uniqueId}`);
             let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
-            if (currentScan < qtyOrder) {
-                currentScan++;
+            // Cek apakah penambahan akan melebihi qty order
+            if (currentScan + scanQtyToAdd <= qtyOrder) {
+                currentScan += scanQtyToAdd;
                 if (isHUscan) {
-                    scannedHUs.add(code);
+                    scannedHUs.add(code); // Tambahkan HU ke set scannedHUs
                 }
 
-                showAlert('Berhasil!', `Item ${foundItem.material} discan.`, 'success');
+                showAlert('Berhasil!', `Item ${foundItem.material} discan (+${scanQtyToAdd}).`, 'success');
                 saveScanToDatabase({
                     do_number: currentDOData.do_number,
                     material_number: foundItem.material,
                     item_number: foundItem.item_no,
                     scanned_code: originalBarcode,
-                    batch_number: batchNumber
+                    batch_number: batchNumber,
+                    qty_scanned: scanQtyToAdd
                 });
 
                 scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
@@ -624,17 +679,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateSummary();
                 if(isHUscan) updateHUDetailView();
             } else {
-                showAlert('Penuh!', `Item ${foundItem.material} (${foundItem.item_no}) sudah memenuhi kuantitas.`, 'warning');
+                 showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}).`, 'warning');
             }
         } else {
             showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di DO ini.`, 'error');
         }
     }
 
-    function updateHUDetailView() {
+     function updateHUDetailView() {
         document.querySelectorAll('.details-table tbody tr').forEach(row => {
             const huNumberCell = row.cells[2];
-            if (huNumberCell && scannedHUs.has(huNumberCell.textContent)) {
+            if (huNumberCell && huNumberCell.textContent && scannedHUs.has(huNumberCell.textContent.trim())) {
                 row.classList.add('hu-scanned');
                 const statusCell = row.cells[6];
                 if (statusCell && !statusCell.querySelector('.fa-check-circle')) {
@@ -646,28 +701,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function saveScanToDatabase(scanData) {
         try {
-            await fetch('{{ route("do.verify.scan") }}', {
+            await fetchWithTimeout('{{ route("do.verify.scan") }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify(scanData)
             });
-        } catch (error) { console.error('Gagal menyimpan scan ke DB:', error); }
+            console.log('Scan berhasil disimpan ke DB:', scanData);
+        } catch (error) {
+            console.error('Gagal menyimpan scan ke DB:', error.message);
+            showAlert('Gagal Simpan', 'Gagal menyimpan data scan ke server. Perubahan mungkin tidak tersimpan.', 'error');
+        }
     }
 
     function updateSummary() {
         let totalOrder = 0; let totalScanned = 0;
+        if (!currentDOData || !currentDOData.items) return;
+
         currentDOData.items.forEach(item => {
             const uniqueId = `${item.material}-${item.item_no}`;
-            totalOrder += item.qty_order;
-            const textContent = document.getElementById(`progresstext-${uniqueId}`).textContent;
-            const scanned = parseInt(textContent.split(' / ')[0], 10) || 0;
-            totalScanned += scanned;
+            const textElement = document.getElementById(`progresstext-${uniqueId}`);
+            if (textElement) {
+                totalOrder += item.qty_order;
+                const textContent = textElement.textContent || '0 / 0';
+                const scanned = parseInt(textContent.split(' / ')[0], 10) || 0;
+                totalScanned += scanned;
+            } else {
+                console.warn(`Elemen progresstext-${uniqueId} tidak ditemukan.`);
+            }
         });
 
         document.getElementById('summary-total-item').textContent = currentDOData.items.length;
         document.getElementById('summary-qty-order').textContent = totalOrder;
         document.getElementById('summary-qty-scanned').textContent = totalScanned;
-        document.getElementById('summary-sisa').textContent = totalOrder - totalScanned;
+        document.getElementById('summary-sisa').textContent = Math.max(0, totalOrder - totalScanned);
 
         if (totalOrder > 0 && totalScanned >= totalOrder && !isCompletionNotified) {
             isCompletionNotified = true;
@@ -676,17 +742,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+
     async function triggerEmailNotification() {
         try {
-            await fetch('{{ route("do.verify.complete") }}', {
+            if (!currentDOData || !currentDOData.do_number) {
+                 console.error("Tidak bisa mengirim notifikasi, data DO tidak lengkap.");
+                 return;
+            }
+            await fetchWithTimeout('{{ route("do.verify.complete") }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify({ do_number: currentDOData.do_number })
             });
+             console.log('Notifikasi email berhasil dipicu untuk DO:', currentDOData.do_number);
         } catch(error) {
-            console.error('Gagal memicu pengiriman email:', error);
+            console.error('Gagal memicu pengiriman email:', error.message);
         }
     }
+
 
     function isNumeric(str) {
         if (typeof str != "string") return false
@@ -728,28 +801,80 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- LOGIKA KAMERA ---
-    btnCameraScan.addEventListener('click', () => cameraScannerModal.show());
-
-    document.getElementById('cameraScannerModal').addEventListener('shown.bs.modal', function () {
-        if (!html5QrcodeScanner || (html5QrcodeScanner && !html5QrcodeScanner.isScanning)) {
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, ()=>{});
-        }
+    // --- PERBAIKAN: Tombol hanya menampilkan modal ---
+    btnCameraScan.addEventListener('click', () => {
+        cameraScannerModal.show();
     });
 
-    document.getElementById('cameraScannerModal').addEventListener('hidden.bs.modal', function () {
+    // --- PERBAIKAN: Memulai scanner hanya saat modal benar-benar tampil ---
+    cameraScannerModalElement.addEventListener('shown.bs.modal', function () {
+        startCameraScan();
+    });
+
+    // --- PERBAIKAN: Menghentikan scanner saat modal ditutup ---
+    cameraScannerModalElement.addEventListener('hidden.bs.modal', function () {
+        stopCameraScan();
+    });
+
+    function startCameraScan() {
+        // Jangan mulai jika sudah berjalan
         if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-            html5QrcodeScanner.stop().catch(err => console.error("Gagal menghentikan scanner.", err));
+            console.log("Scanner sudah berjalan.");
+            return;
         }
-    });
+         try {
+            // Inisialisasi scanner di elemen #reader
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true };
+
+            // Mulai scanner
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+                .then(() => {
+                    console.log("Scanner kamera dimulai.");
+                })
+                .catch(err => {
+                    console.error("Gagal memulai scanner kamera.", err);
+                     showAlert('Error Kamera', 'Gagal memulai kamera. Pastikan izin telah diberikan.', 'error');
+                });
+         } catch (e) {
+             console.error("Error saat inisialisasi Html5Qrcode:", e);
+             showAlert('Error Scanner', 'Gagal memuat komponen scanner.', 'error');
+         }
+    }
+
+    function stopCameraScan() {
+        // Hanya hentikan jika sedang berjalan
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.stop()
+                .then(() => {
+                    console.log("Scanner kamera dihentikan.");
+                     // --- PERBAIKAN: Bersihkan elemen #reader setelah berhenti ---
+                     const readerElement = document.getElementById('reader');
+                     if(readerElement) readerElement.innerHTML = '';
+                     html5QrcodeScanner = null; // Reset instance scanner
+                })
+                .catch(err => {
+                    console.error("Gagal menghentikan scanner.", err);
+                });
+        } else {
+             console.log("Scanner tidak sedang berjalan atau belum diinisialisasi.");
+        }
+    }
+
 
     function onScanSuccess(decodedText, decodedResult) {
         if (isScanCooldown) return;
         isScanCooldown = true;
         processScannedBarcode(decodedText);
         if (window.navigator.vibrate) { window.navigator.vibrate(100); }
-        setTimeout(() => { isScanCooldown = false; }, 2000);
+        cameraScannerModal.hide(); // Sembunyikan modal setelah scan berhasil
+        // Tidak perlu stop manual karena akan ditangani oleh event 'hidden.bs.modal'
+        setTimeout(() => { isScanCooldown = false; }, 1000);
+    }
+
+    function onScanFailure(error) {
+       // Biarkan kosong atau tambahkan log jika perlu
+       // console.warn(`Scan gagal, coba lagi.`);
     }
 });
 </script>

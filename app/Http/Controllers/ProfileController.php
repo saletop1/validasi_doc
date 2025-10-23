@@ -10,17 +10,11 @@ use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
-    /**
-     * Menampilkan halaman untuk ganti password.
-     */
     public function editPassword()
     {
         return view('profile.edit-password');
     }
 
-    /**
-     * Memperbarui password pengguna yang sedang login.
-     */
     public function updatePassword(Request $request)
     {
         $request->validate([
@@ -30,16 +24,12 @@ class ProfileController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
-
-        // Cek apakah password saat ini cocok
         if (!Hash::check($request->current_password, $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => 'Password saat ini yang Anda masukkan salah.',
             ]);
         }
 
-        // --- PERBAIKAN: Memperbarui password dan timestamp secara eksplisit ---
-        // Cara ini menghindari masalah Mass Assignment
         $user->password = Hash::make($request->new_password);
         $user->password_changed_at = now();
         $user->save();

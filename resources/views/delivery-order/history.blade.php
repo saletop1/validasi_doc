@@ -14,7 +14,7 @@
         box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.07);
     }
     .card-header-custom {
-        background: linear-gradient(45deg, #6c757d, #343a40);
+        background: linear-gradient(45deg, #21de9fff, #415c78ff);
         color: white;
         padding: 1.5rem;
         text-align: center;
@@ -23,7 +23,7 @@
         border: 1px solid #dee2e6;
         border-radius: 0.75rem;
         margin-bottom: 1rem;
-        transition: box-shadow 0.3s ease, transform 0.3s ease;
+        transition: box-shadow 0.1s ease, transform 0.1s ease;
         cursor: pointer;
     }
     .history-card:hover {
@@ -35,19 +35,19 @@
     }
     .do-number {
         font-size: 1.25rem;
-        font-weight: 700;
-        color: #0d6efd;
+        font-weight: 800;
+        color: #00b45dff;
     }
     .customer-name {
         font-weight: 600;
         color: #212529;
     }
     .verification-date {
-        font-size: 0.9rem;
-        color: #6c757d;
+        font-size: 0.8rem;
+        color: #00b45dff;
     }
     .filter-input {
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.2rem;
     }
     #historyDetailModal .modal-body {
         padding-top: 0;
@@ -58,17 +58,17 @@
     .summary-box {
         color: white;
         border-radius: 0.5rem;
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
     }
     .summary-box h6 {
         color: rgba(255, 255, 255, 0.85);
     }
     .summary-success {
-        background: linear-gradient(135deg, #2E7D32, #388E3C);
+        background: linear-gradient(135deg, #2E7D32, #1b365aff);
     }
     .summary-danger {
-        background: linear-gradient(135deg, #C62828, #D32F2F);
+        background: linear-gradient(135deg, #abb724ff, #abb724ff);
     }
 
     #modal-summary-area {
@@ -81,7 +81,7 @@
     #historyDetailModal .table thead th {
         position: sticky;
         z-index: 2;
-        background-color: #ffffff;
+        background-color: #ffffffff;
         box-shadow: inset 0 -2px 0 #dee2e6;
     }
     /* Style untuk Tab */
@@ -91,10 +91,10 @@
         border-bottom: 3px solid transparent;
     }
     .nav-tabs .nav-link.active {
-        color: #0d6efd;
+        color: #6c757d;
         font-weight: 600;
         background-color: transparent;
-        border-bottom: 3px solid #0d6efd;
+        border-bottom: 3px solid #00b45dff;
     }
 </style>
 @endpush
