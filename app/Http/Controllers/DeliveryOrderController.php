@@ -8,15 +8,18 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCompleted;
-// use App\Models\User;
+use App\Models\User;
 use Carbon\Carbon;
-// use Illuminate\Support\Facades\Auth;
-// use Illuminate\Support\Facades\Hash;
-// use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Session;
 use Throwable;
+use Illuminate\Support\Collection; // Import Collection
 
 class DeliveryOrderController extends Controller
 {
+    // ... (fungsi verifyIndex, historyIndex, getScannedItemsForDO) ...
+    // --- Bagian ini tidak berubah ---
     public function verifyIndex()
     {
         return view('delivery-order.verify');
@@ -28,18 +31,25 @@ class DeliveryOrderController extends Controller
         $completedDos = DB::table('do_list')
             ->whereNotNull('VERIFIED_AT')
             ->orderBy('VERIFIED_AT', 'desc')
-            ->get()
-            ->groupBy('VBELN');
+            ->select('VBELN', 'NAME1', 'VERIFIED_AT') // Hanya ambil kolom yang dibutuhkan
+            ->distinct('VBELN') // Pastikan unik
+            ->get();
 
         // 2. Ambil DO yang sedang dalam proses (sudah ada scan tapi belum selesai)
-        $inProgressDos = DB::table('do_list')
-            ->whereNull('VERIFIED_AT')
-            ->whereIn('VBELN', function ($query) {
-                $query->select('do_number')->from('scanned_items')->distinct();
+        $inProgressDoNumbers = DB::table('scanned_items')
+            ->whereNotIn('do_number', function ($query) {
+                $query->select('VBELN')->from('do_list')->whereNotNull('VERIFIED_AT');
             })
+            ->distinct('do_number')
+            ->pluck('do_number');
+
+        $inProgressDos = DB::table('do_list')
+            ->whereIn('VBELN', $inProgressDoNumbers)
             ->orderBy('updated_at', 'desc') // Urutkan berdasarkan aktivitas terakhir
-            ->get()
-            ->groupBy('VBELN');
+            ->select('VBELN', 'NAME1', 'updated_at') // Hanya ambil kolom yang dibutuhkan
+            ->distinct('VBELN') // Pastikan unik
+            ->get();
+
 
         // 3. Kirim kedua data ke view
         return view('delivery-order.history', [
@@ -48,50 +58,44 @@ class DeliveryOrderController extends Controller
         ]);
     }
 
-    /**
-     * Mengambil detail item yang sudah discan untuk sebuah DO.
-     *
-     * @param string $doNumber
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function getScannedItemsForDO($doNumber)
     {
         try {
-            // Ambil semua item asli dari DO
-            $doListItems = DB::table('do_list')
+            // Mengambil data dan mengelompokkannya
+            $doListItemsGrouped = DB::table('do_list')
                 ->where('VBELN', $doNumber)
-                ->select('MATNR as material_number', 'MAKTX as description', 'POSNR as item_number', 'LFIMG as qty_order')
-                ->orderBy('POSNR', 'asc')
+                ->select('MATNR', 'MAKTX', DB::raw('SUM(LFIMG) as total_qty_order'))
+                ->groupBy('MATNR', 'MAKTX')
+                ->orderBy('MATNR', 'asc')
                 ->get();
 
-            // Ambil jumlah item yang sudah discan, dikelompokkan
+            // Ambil jumlah item yang sudah discan
             $scannedCounts = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
-                ->get()
-                ->groupBy(function ($item) {
-                    return $item->material_number . '-' . $item->item_number;
-                })
-                ->map(function ($group) {
-                    return $group->count();
-                });
+                ->select('material_number', DB::raw('SUM(qty_scanned) as total_qty_scan'))
+                ->groupBy('material_number')
+                ->pluck('total_qty_scan', 'material_number');
 
             $totalOrder = 0;
             $totalScan = 0;
 
-            // Gabungkan data dan hitung total
-            $results = $doListItems->map(function ($item, $key) use ($scannedCounts, &$totalOrder, &$totalScan) {
-                $materialKey = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
-                $itemKey = ltrim($item->item_number, '0');
-                $uniqueKey = $materialKey . '-' . $itemKey;
+            // Gabungkan data
+            $results = $doListItemsGrouped->map(function ($item, $key) use ($scannedCounts, &$totalOrder, &$totalScan) {
+                $materialKey = ctype_digit((string)$item->MATNR) ? ltrim($item->MATNR, '0') : $item->MATNR;
+                $qtyScan = $scannedCounts->get($item->MATNR, 0); // Gunakan MATNR asli dari do_list untuk key
 
-                $item->no = $key + 1;
-                $item->qty_scan = $scannedCounts->get($uniqueKey, 0);
-                $item->qty_order = (int)$item->qty_order;
+                $itemData = [
+                    'no' => $key + 1,
+                    'material_number' => $materialKey, // Tampilkan material yang sudah diformat
+                    'description' => $item->MAKTX,
+                    'qty_order' => (int)$item->total_qty_order,
+                    'qty_scan' => (int)$qtyScan,
+                ];
 
-                $totalOrder += $item->qty_order;
-                $totalScan += $item->qty_scan;
+                $totalOrder += $itemData['qty_order'];
+                $totalScan += $itemData['qty_scan'];
 
-                return $item;
+                return $itemData;
             });
 
             return response()->json([
@@ -103,7 +107,7 @@ class DeliveryOrderController extends Controller
             ]);
 
         } catch (Throwable $e) {
-            Log::error('Gagal mengambil detail riwayat: ' . $e->getMessage());
+            Log::error('Gagal mengambil detail riwayat: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString());
             return response()->json(['error' => 'Gagal memuat data detail.'], 500);
         }
     }
@@ -119,15 +123,14 @@ class DeliveryOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'status' => 'completed',
-                // --- PERBAIKAN: Menggunakan Carbon setelah di-import ---
                 'message' => "Verifikasi untuk DO {$doNumber} sudah selesai pada " . Carbon::parse($existingDO->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d-m-Y H:i')
             ], 200);
         }
 
         try {
-            $response = Http::timeout(20)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
-                'username' => "auto_email",
-                'password' => "11223344",
+            $response = Http::timeout(30)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
+                'username' => env('SAP_USERNAME'),
+                'password' => env('SAP_PASSWORD'),
                 'P_VBELN' => $doNumber,
             ]);
 
@@ -169,24 +172,30 @@ class DeliveryOrderController extends Controller
                 ->select('V_NO_CONT')
                 ->first();
 
-            $doItems = DB::table('do_list')
+            // Mengambil Item DO dan Mengelompokkannya
+            $doItemsGrouped = DB::table('do_list')
                 ->where('VBELN', $doNumber)
-                ->select('MATNR as material', 'MAKTX as description', 'VBELN as do_no', 'POSNR as item_no', 'CHARG2 as batch_no', 'LFIMG as qty_order')
+                ->select('MATNR', 'MAKTX', 'VBELN as do_no', 'POSNR as item_no', 'CHARG2 as batch_no', DB::raw('SUM(LFIMG) as qty_order'))
+                ->groupBy('MATNR', 'MAKTX', 'VBELN', 'POSNR', 'CHARG2') // Group by all relevant non-aggregated columns
                 ->get();
+
 
             $allHuDetails = DB::table('do_list_details')
                 ->where('DELV', $doNumber)
-                ->select('DELV as delivery', 'ITEM', 'EXIDV as hu_no', 'ITEM2 as item_hu', 'CHARG2 as charg2', 'VEMNG as qty_hu')
+                ->select('DELV', 'ITEM', 'EXIDV as hu_no', 'ITEM2 as item_hu', 'CHARG2 as charg2', 'VEMNG as qty_hu') // Ambil DELV juga
                 ->get()
-                ->groupBy('ITEM');
+                ->groupBy('ITEM'); // Kelompokkan HU berdasarkan POSNR asli (ITEM)
 
-            $formattedItems = $doItems->map(function ($item) use ($allHuDetails) {
-                $material = ctype_digit((string)$item->material) ? ltrim($item->material, '0') : $item->material;
-                $itemNo = ctype_digit((string)$item->item_no) ? ltrim($item->item_no, '0') : $item->item_no;
+            $formattedItems = $doItemsGrouped->map(function ($item) use ($allHuDetails) {
+                $posnrKey = $item->item_no; // POSNR asli dari do_list
 
-                $huDetailsForItem = $allHuDetails->get($item->item_no, collect())->map(function($detail) {
+                $material = ctype_digit((string)$item->MATNR) ? ltrim($item->MATNR, '0') : $item->MATNR;
+                $itemNo = ctype_digit((string)$posnrKey) ? ltrim($posnrKey, '0') : $posnrKey;
+
+
+                $huDetailsForItem = $allHuDetails->get($posnrKey, collect())->map(function($detail) {
                     return [
-                        'delivery' => $detail->delivery,
+                        'delivery' => $detail->DELV ?? null, // Gunakan DELV dari do_list_details
                         'item' => ctype_digit((string)$detail->ITEM) ? ltrim($detail->ITEM, '0') : $detail->ITEM,
                         'hu_no' => ctype_digit((string)$detail->hu_no) ? ltrim($detail->hu_no, '0') : $detail->hu_no,
                         'item_hu' => ctype_digit((string)$detail->item_hu) ? ltrim($detail->item_hu, '0') : $detail->item_hu,
@@ -197,28 +206,39 @@ class DeliveryOrderController extends Controller
 
                 return [
                     'material' => $material,
-                    'description' => $item->description,
+                    'description' => $item->MAKTX,
                     'do_no' => $item->do_no,
                     'item_no' => $itemNo,
                     'batch_no' => $item->batch_no,
-                    'qty_order' => (int)$item->qty_order,
+                    'qty_order' => (int)$item->qty_order, // Gunakan qty_order hasil SUM
                     'is_hu' => $huDetailsForItem->isNotEmpty(),
                     'hu_details' => $huDetailsForItem->values()->all(),
                 ];
             })->values();
 
+             // Menghitung progress scan (SUM qty_scanned)
             $progressData = DB::table('scanned_items')->where('do_number', $doNumber)->get();
-            $scannedHus = $progressData->pluck('scanned_code')->filter()->unique()->values()->map(function($hu){
-                 return ctype_digit((string)$hu) ? ltrim($hu, '0') : $hu;
-            })->all();
 
+            // Ambil daftar HU unik yang sudah discan
+            $scannedHus = $progressData->whereNotNull('batch_number') // Asumsi HU memiliki batch number, filter jika perlu
+                                     ->pluck('scanned_code')
+                                     ->filter()
+                                     ->unique()
+                                     ->values()
+                                     ->map(function($hu){
+                                         return ctype_digit((string)$hu) ? ltrim($hu, '0') : $hu;
+                                     })
+                                     ->all();
+
+            // Hitung total qty_scanned per item (material + item_no/POSNR)
             $scannedCounts = $progressData->groupBy(function($item) {
                 $material = ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
-                $itemNo = ctype_digit((string)$item->item_number) ? ltrim($item->item_number, '0') : $item->item_number;
+                $itemNo = ctype_digit((string)$item->item_number) ? ltrim($item->item_number, '0') : $item->item_number; // item_number adalah POSNR
                 return $material . '-' . $itemNo;
             })->mapWithKeys(function ($group, $key) {
-                return [$key => $group->count()];
+                return [$key => $group->sum('qty_scanned')]; // Jumlahkan qty_scanned
             });
+
 
             $progress = [
                 'hus' => $scannedHus,
@@ -240,7 +260,7 @@ class DeliveryOrderController extends Controller
             return response()->json(['success' => true, 'data' => $data]);
 
         } catch (Throwable $e) {
-            Log::error('Error saat mengambil data dari DB lokal: ' . $e->getMessage() . ' pada baris ' . $e->getLine());
+            Log::error('Error saat mengambil data dari DB lokal: ' . $e->getMessage() . ' pada baris ' . $e->getLine() . ' Trace: ' . $e->getTraceAsString());
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan internal pada server.'], 500);
         }
     }
@@ -248,8 +268,13 @@ class DeliveryOrderController extends Controller
     private function saveSapDataToLocal(string $doNumber, array $tData, array $tData2): void
     {
         DB::transaction(function () use ($doNumber, $tData, $tData2) {
-            DB::table('do_list')->where('VBELN', $doNumber)->delete();
-            DB::table('do_list_details')->where('DELV', $doNumber)->delete();
+            // Hapus data lama hanya jika data baru dari SAP tidak kosong
+             if (!empty($tData)) {
+                 DB::table('do_list')->where('VBELN', $doNumber)->delete();
+             }
+             if (!empty($tData2)) {
+                 DB::table('do_list_details')->where('DELV', $doNumber)->delete();
+             }
 
             $doListToInsert = [];
             foreach ($tData as $item) {
@@ -274,17 +299,21 @@ class DeliveryOrderController extends Controller
                     'updated_at' => now(),
                 ];
             }
-            DB::table('do_list')->insert($doListToInsert);
+            if (!empty($doListToInsert)) {
+                DB::table('do_list')->insert($doListToInsert);
+            }
+
 
             if (!empty($tData2)) {
                 $uniqueHuDetails = [];
                 $seenCombinations = [];
 
                 foreach ($tData2 as $detail) {
-                    $combinationKey = ($detail['EXIDV'] ?? '') . '-' . ($detail['CHARG2'] ?? '');
+                    $combinationKey = ($detail['EXIDV'] ?? '') . '-' . ($detail['ITEM'] ?? '');
                     if (!isset($seenCombinations[$combinationKey])) {
                         $uniqueHuDetails[] = [
                             'DELV' => $detail['DELV'] ?? null,
+                            'ITEM' => $detail['ITEM'] ?? null,
                             'ITEM2' => $detail['ITEM2'] ?? null,
                             'KDAUF' => $detail['KDAUF'] ?? null,
                             'KDPOS' => $detail['KDPOS'] ?? null,
@@ -294,7 +323,6 @@ class DeliveryOrderController extends Controller
                             'V_NO_CONT' => $detail['V_NO_CONT'] ?? null,
                             'CHARG2' => $detail['CHARG2'] ?? null,
                             'EXIDV' => $detail['EXIDV'] ?? null,
-                            'ITEM' => $detail['ITEM'] ?? null,
                             'VEMNG' => (float)($detail['VEMNG'] ?? 0),
                             'VEMEH' => $detail['VEMEH'] ?? null,
                             'created_at' => now(),
@@ -303,7 +331,9 @@ class DeliveryOrderController extends Controller
                         $seenCombinations[$combinationKey] = true;
                     }
                 }
-                DB::table('do_list_details')->insert($uniqueHuDetails);
+                if (!empty($uniqueHuDetails)) {
+                     DB::table('do_list_details')->insert($uniqueHuDetails);
+                }
             }
         });
     }
@@ -316,15 +346,17 @@ class DeliveryOrderController extends Controller
                 'material_number' => 'required|string',
                 'scanned_code' => 'required|string',
                 'batch_number' => 'nullable|string',
-                'item_number' => 'nullable|string',
+                'item_number' => 'required|string',
+                'qty_scanned' => 'required|integer|min:1'
             ]);
 
             DB::table('scanned_items')->insert([
                 'do_number' => $validated['do_number'],
-                'item_number' => $validated['item_number'] ?? null,
+                'item_number' => $validated['item_number'],
                 'material_number' => $validated['material_number'],
                 'scanned_code' => $validated['scanned_code'],
                 'batch_number' => $validated['batch_number'],
+                'qty_scanned' => $validated['qty_scanned'],
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -345,16 +377,16 @@ class DeliveryOrderController extends Controller
             $doHeader = DB::table('do_list')->where('VBELN', $doNumber)->first();
 
             if ($doHeader) {
-                // Menghitung total kuantitas order
                 $totalQty = DB::table('do_list')->where('VBELN', $doNumber)->sum('LFIMG');
 
-                DB::table('do_list')->where('VBELN', 'like', $doNumber . '%')->update([
+                // Update SEMUA baris do_list yang cocok
+                DB::table('do_list')->where('VBELN', $doNumber)->update([
                     'VERIFIED_AT' => now(),
-                    'SCANNED_QTY' => $totalQty
+                    'SCANNED_QTY' => $totalQty // Asumsi selesai = semua qty order
                 ]);
 
-                $containerNo = DB::table('do_list_details')->where('DELV', $doNumber)->value('V_NO_CONT');
 
+                $containerNo = DB::table('do_list_details')->where('DELV', $doNumber)->value('V_NO_CONT');
                 $emailData = [
                     'do_number' => $doNumber,
                     'customer' => $doHeader->NAME1,
@@ -364,8 +396,14 @@ class DeliveryOrderController extends Controller
 
                 $recipients = explode(',', env('MAIL_RECIPIENTS', 'default@example.com'));
 
-                // Mail::to($recipients)->send(new VerificationCompleted($emailData));
-                Log::info("Email notifikasi untuk DO {$doNumber} telah dimasukkan ke dalam antrian.");
+                // --- PERBAIKAN: Memastikan Mail::to() berfungsi ---
+                // Pastikan $recipients adalah array yang valid sebelum dikirim
+                 if (!empty($recipients) && is_array($recipients)) {
+                     Mail::to($recipients)->send(new VerificationCompleted($emailData));
+                     Log::info("Email notifikasi untuk DO {$doNumber} telah dimasukkan ke dalam antrian.");
+                 } else {
+                     Log::warning("Tidak ada penerima email yang valid untuk DO {$doNumber}. Cek MAIL_RECIPIENTS di .env");
+                 }
 
                 return response()->json(['success' => true, 'message' => 'Permintaan pengiriman email diterima.']);
             }
@@ -376,5 +414,5 @@ class DeliveryOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Gagal memicu pengiriman email.'], 500);
         }
     }
-}
+} // --- Pastikan kurung kurawal penutup kelas ada ---
 
