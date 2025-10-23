@@ -14,7 +14,7 @@
         box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.07);
     }
     .card-header-custom {
-        background: linear-gradient(45deg, #21de9fff, #415c78ff);
+        background: linear-gradient(45deg, #6c757d, #343a40);
         color: white;
         padding: 1.5rem;
         text-align: center;
@@ -23,7 +23,7 @@
         border: 1px solid #dee2e6;
         border-radius: 0.75rem;
         margin-bottom: 1rem;
-        transition: box-shadow 0.1s ease, transform 0.1s ease;
+        transition: box-shadow 0.3s ease, transform 0.3s ease;
         cursor: pointer;
     }
     .history-card:hover {
@@ -35,19 +35,19 @@
     }
     .do-number {
         font-size: 1.25rem;
-        font-weight: 800;
-        color: #00b45dff;
+        font-weight: 700;
+        color: #0d6efd;
     }
     .customer-name {
         font-weight: 600;
         color: #212529;
     }
     .verification-date {
-        font-size: 0.8rem;
-        color: #00b45dff;
+        font-size: 0.9rem;
+        color: #6c757d;
     }
     .filter-input {
-        margin-bottom: 0.2rem;
+        margin-bottom: 1.5rem;
     }
     #historyDetailModal .modal-body {
         padding-top: 0;
@@ -58,17 +58,17 @@
     .summary-box {
         color: white;
         border-radius: 0.5rem;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
     }
     .summary-box h6 {
         color: rgba(255, 255, 255, 0.85);
     }
     .summary-success {
-        background: linear-gradient(135deg, #2E7D32, #1b365aff);
+        background: linear-gradient(135deg, #2E7D32, #388E3C);
     }
     .summary-danger {
-        background: linear-gradient(135deg, #abb724ff, #abb724ff);
+        background: linear-gradient(135deg, #C62828, #D32F2F);
     }
 
     #modal-summary-area {
@@ -81,7 +81,7 @@
     #historyDetailModal .table thead th {
         position: sticky;
         z-index: 2;
-        background-color: #ffffffff;
+        background-color: #ffffff;
         box-shadow: inset 0 -2px 0 #dee2e6;
     }
     /* Style untuk Tab */
@@ -91,10 +91,10 @@
         border-bottom: 3px solid transparent;
     }
     .nav-tabs .nav-link.active {
-        color: #6c757d;
+        color: #0d6efd;
         font-weight: 600;
         background-color: transparent;
-        border-bottom: 3px solid #00b45dff;
+        border-bottom: 3px solid #0d6efd;
     }
 </style>
 @endpush
@@ -128,19 +128,19 @@
                 <!-- Panel Selesai -->
                 <div class="tab-pane fade show active" id="completed-panel" role="tabpanel" aria-labelledby="completed-tab">
                     <div class="row history-list">
-                        @forelse ($completedDos as $doNumber => $items)
-                            @php $firstItem = $items->first(); @endphp
-                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($doNumber . ' ' . $firstItem->NAME1) }}">
-                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $doNumber }}">
+                        {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
+                        @forelse ($completedDos as $items)
+                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}">
+                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <p class="do-number mb-1">{{ $doNumber }}</p>
+                                            <p class="do-number mb-1">{{ $items->VBELN }}</p>
                                             <span class="badge bg-success">Selesai</span>
                                         </div>
-                                        <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
+                                        <p class="customer-name mb-1">{{ $items->NAME1 }}</p>
                                         <p class="verification-date mb-0">
                                             <i class="fas fa-check-circle me-1"></i>
-                                            Diverifikasi pada: {{ \Carbon\Carbon::parse($firstItem->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                            Diverifikasi pada: {{ \Carbon\Carbon::parse($items->VERIFIED_AT)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
                                         </p>
                                     </div>
                                 </div>
@@ -155,19 +155,19 @@
                 <!-- Panel Dalam Proses -->
                 <div class="tab-pane fade" id="inprogress-panel" role="tabpanel" aria-labelledby="inprogress-tab">
                     <div class="row history-list">
-                        @forelse ($inProgressDos as $doNumber => $items)
-                            @php $firstItem = $items->first(); @endphp
-                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($doNumber . ' ' . $firstItem->NAME1) }}">
-                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $doNumber }}">
+                         {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
+                        @forelse ($inProgressDos as $items)
+                            <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}">
+                                <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <p class="do-number mb-1">{{ $doNumber }}</p>
+                                            <p class="do-number mb-1">{{ $items->VBELN }}</p>
                                             <span class="badge bg-warning text-dark">Proses</span>
                                         </div>
-                                        <p class="customer-name mb-1">{{ $firstItem->NAME1 }}</p>
+                                        <p class="customer-name mb-1">{{ $items->NAME1 }}</p>
                                         <p class="verification-date mb-0">
                                             <i class="fas fa-sync-alt me-1"></i>
-                                            Aktivitas terakhir: {{ \Carbon\Carbon::parse($firstItem->updated_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                            Aktivitas terakhir: {{ \Carbon\Carbon::parse($items->updated_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
                                         </p>
                                     </div>
                                 </div>
@@ -184,6 +184,7 @@
     </div>
 </div>
 
+{{-- Modal Detail (tidak ada perubahan di sini) --}}
 <div class="modal fade" id="historyDetailModal" tabindex="-1" aria-labelledby="historyDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -237,16 +238,18 @@
         filterInput.addEventListener('keyup', function() {
             const filterText = this.value.toLowerCase();
             const activeTabPane = document.querySelector('.tab-pane.active');
-            const historyItems = activeTabPane.querySelectorAll('.history-item');
-
-            historyItems.forEach(item => {
-                const itemText = item.getAttribute('data-filter-text');
-                if (itemText.includes(filterText)) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
+            // Pastikan activeTabPane ditemukan sebelum querySelectorAll
+            if (activeTabPane) {
+                const historyItems = activeTabPane.querySelectorAll('.history-item');
+                historyItems.forEach(item => {
+                    const itemText = item.getAttribute('data-filter-text');
+                    if (itemText.includes(filterText)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            }
         });
 
         historyDetailModal.addEventListener('show.bs.modal', async function (event) {
@@ -262,7 +265,7 @@
             try {
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
 
-                const response = await fetch(url);
+                const response = await fetch(url); // Fetch tanpa timeout di sini
                 if (!response.ok) throw new Error('Gagal mengambil data dari server');
 
                 const data = await response.json();
@@ -319,12 +322,14 @@
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
 
+                // Logika untuk mengatur posisi sticky header tabel
                 const summaryElement = document.getElementById('modal-summary-area');
                 const tableHeaderCells = document.querySelectorAll('#historyDetailModal .table thead th');
 
                 if (tableHeaderCells.length > 0) {
                     setTimeout(() => {
                         let stickyTopOffset = 0;
+                        // Pastikan summaryElement ada dan punya child nodes sebelum ambil offsetHeight
                         if (summaryElement && summaryElement.hasChildNodes()) {
                             stickyTopOffset = summaryElement.offsetHeight;
                         }
@@ -338,4 +343,3 @@
     });
 </script>
 @endpush
-
