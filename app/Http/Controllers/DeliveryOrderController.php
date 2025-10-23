@@ -434,7 +434,7 @@ class DeliveryOrderController extends Controller
             if ($doHeader) {
                 $totalQty = DB::table('do_list')->where('VBELN', $doNumber)->sum('LFIMG');
 
-                DB::table('do_list')->where('VBELN', $doNumber)->update([ // Cukup update berdasarkan VBELN
+                DB::table('do_list')->where('VBELN', $doNumber)->update([ 
                     'VERIFIED_AT' => now(),
                     'SCANNED_QTY' => $totalQty
                 ]);
