@@ -14,7 +14,7 @@
         box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.07);
     }
     .card-header-custom {
-        background: linear-gradient(45deg, #6c757d, #343a40);
+        background: linear-gradient(45deg, #1ddec8ff, #343a40);
         color: white;
         padding: 1.5rem;
         text-align: center;
@@ -36,7 +36,7 @@
     .do-number {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #0d6efd;
+        color: #17624aff;
     }
     .customer-name {
         font-weight: 600;
@@ -44,7 +44,7 @@
     }
     .verification-date {
         font-size: 0.9rem;
-        color: #6c757d;
+        color: #15a493ff;
     }
     .filter-input {
         margin-bottom: 1.5rem;
@@ -68,7 +68,7 @@
         background: linear-gradient(135deg, #2E7D32, #388E3C);
     }
     .summary-danger {
-        background: linear-gradient(135deg, #C62828, #D32F2F);
+        background: linear-gradient(135deg, #c6b928ff, #c6b928ff);
     }
 
     #modal-summary-area {
@@ -91,10 +91,10 @@
         border-bottom: 3px solid transparent;
     }
     .nav-tabs .nav-link.active {
-        color: #0d6efd;
+        color: #123301ff;
         font-weight: 600;
         background-color: transparent;
-        border-bottom: 3px solid #0d6efd;
+        border-bottom: 3px solid #6f6f6fe2;
     }
 </style>
 @endpush
