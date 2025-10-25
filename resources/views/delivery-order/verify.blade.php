@@ -4,7 +4,8 @@
 
 @push('styles')
 <style>
-    :root {
+    /* ... (style Anda sebelumnya tidak berubah) ... */
+     :root {
         --primary-color: #0d6efd;
         --secondary-color: #6c757d;
         --success-color: #198754;
@@ -406,8 +407,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let isScanCooldown = false;
 
     let currentDOData = null;
-    let scannedHUs = new Set();
+    let scannedHUs = new Set(); // Set untuk melacak HU yang sudah discan di DO ini
     let isCompletionNotified = false;
+    let multiItemHuMap = {}; // Untuk menyimpan peta HU multi-item
 
     const logoutForm = document.getElementById('logout-form');
     if (logoutForm) {
@@ -417,7 +419,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function fetchWithTimeout(resource, options = {}, timeout = 30000) {
-        const controller = new AbortController();
+        // ... (fungsi fetchWithTimeout tidak berubah) ...
+         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeout);
         try {
             const response = await fetch(resource, { ...options, signal: controller.signal });
@@ -455,11 +458,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function searchDO() {
+        // ... (fungsi searchDO tidak berubah, tapi simpan multiItemHuMap) ...
         const doNumber = doNumberInput.value.trim();
         if (!doNumber) return;
         loader.style.display = 'block';
         isCompletionNotified = false;
         doDetailsSection.classList.add('d-none');
+        scannedHUs = new Set(); // Reset HU yang sudah discan untuk DO baru
 
         try {
             const searchUrl = '{{ route("do.verify.search") }}';
@@ -476,6 +481,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 sessionStorage.removeItem('lastSearchedDO');
             } else if (data.success) {
                 currentDOData = data.data;
+                // Simpan peta multi-item HU
+                multiItemHuMap = currentDOData.multiItemHuMap || {};
+                console.log("Multi-Item HU Map:", multiItemHuMap); // Untuk debugging
                 displayDODetails();
                 doDetailsSection.classList.remove('d-none');
                 sessionStorage.setItem('lastSearchedDO', doNumber);
@@ -493,10 +501,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayDODetails() {
+        // ... (fungsi displayDODetails tidak berubah) ...
         if (!currentDOData) return;
         const savedProgress = currentDOData.progress;
         savedProgress.counts = savedProgress.counts || {};
+        // Inisialisasi scannedHUs berdasarkan data progress dari backend
         scannedHUs = new Set(savedProgress.hus || []);
+        console.log("Initial scanned HUs:", scannedHUs);
+
 
         document.getElementById('customer-name').textContent = currentDOData.customer || 'T/A';
         document.getElementById('customer-address').textContent = currentDOData.address || 'T/A';
@@ -526,6 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let detailRowsHtml = '';
             if (item.is_hu && item.hu_details) {
                 detailRowsHtml = item.hu_details.map(detail => {
+                     // Cek apakah HU ini sudah discan berdasarkan data dari backend
                     const isScanned = scannedHUs.has(detail.hu_no);
                     const huNumberDisplay = detail.hu_no || 'N/A';
                     return `<tr class="${isScanned ? 'hu-scanned' : ''}" data-hu-number="${huNumberDisplay}">
@@ -587,130 +600,226 @@ document.addEventListener('DOMContentLoaded', function() {
             updateProgressBarColor(progressKey, savedScanCount, item.qty_order);
         });
         updateSummary();
-        updateHUDetailView();
+        updateHUDetailView(); // Panggil updateHUDetailView setelah semua elemen dibuat
     }
 
 
-    function updateProgressBarColor(progressKey, currentScan, qtyOrder) {
-         const progressBar = document.getElementById(`progressbar-${progressKey}`);
-        if (!progressBar) return;
 
-        const progressPercent = qtyOrder > 0 ? (currentScan / qtyOrder) * 100 : 0;
+    function updateProgressBarColor(progressKey, currentScan, qtyOrder) {
+         // ... (fungsi updateProgressBarColor tidak berubah) ...
+          const progressBar = document.getElementById(`progressbar-${progressKey}`);
+        if (!progressBar) {
+            console.warn(`Progress bar dengan key ${progressKey} tidak ditemukan.`);
+            return;
+        }
+
+        // Pastikan currentScan dan qtyOrder adalah angka
+        const numCurrentScan = Number(currentScan);
+        const numQtyOrder = Number(qtyOrder);
+
+        const progressPercent = numQtyOrder > 0 ? (numCurrentScan / numQtyOrder) * 100 : 0;
         progressBar.style.width = `${progressPercent}%`;
 
         progressBar.classList.remove('in-process', 'complete');
 
-        if (currentScan >= qtyOrder && qtyOrder > 0) {
+         console.log(`Updating progress bar ${progressKey}: Scan=${numCurrentScan}, Order=${numQtyOrder}`); // Logging tambahan
+
+        if (numCurrentScan >= numQtyOrder && numQtyOrder > 0) {
             progressBar.classList.add('complete');
-        } else if (currentScan > 0) {
+             console.log(` -> Marked as complete`);
+        } else if (numCurrentScan > 0) {
             progressBar.classList.add('in-process');
+             console.log(` -> Marked as in-process`);
+        } else {
+             console.log(` -> No class added (scan=0 or order=0)`);
         }
     }
+
 
     function processScannedBarcode(barcode) {
         if (!currentDOData) return;
         const originalBarcode = barcode.trim();
         const code = /^[0-9]+$/.test(originalBarcode) ? originalBarcode.replace(/^0+/, '') : originalBarcode;
 
-        let foundItem = null;
+        let foundItem = null; // Item DO pertama yang cocok (untuk referensi batch, dll.)
         let isHUscan = false;
         let batchNumber = null;
         let scanQtyToAdd = 1;
         let huDetails = [];
+        let affectedItems = []; // Kumpulkan SEMUA item DO yang terpengaruh oleh scan HU ini
 
-        for (const item of currentDOData.items) {
-            if (item.is_hu && item.hu_details) {
-                 const matchingHuDetails = item.hu_details.filter(d => d.hu_no === code);
-                 if (matchingHuDetails.length > 0) {
-                     foundItem = item;
-                     isHUscan = true;
-                     huDetails = matchingHuDetails;
-                     batchNumber = huDetails[0].charg2;
-                     break;
-                 }
-            }
-            if (!item.is_hu && item.batch_no === code) {
-                foundItem = item;
-                isHUscan = false;
-                scanQtyToAdd = 1;
-                batchNumber = item.batch_no;
-                break;
-            }
-        }
+        // Cek dulu apakah ini HU multi-item khusus Brunswick
+        const customerName = currentDOData.customer || '';
+        const isBrunswick = customerName.toLowerCase().includes('brunswick');
+        const associatedItemNos = isBrunswick ? (multiItemHuMap[code] || []) : [];
+        const isMultiItemHu = isBrunswick && associatedItemNos.length > 0;
 
-        if (foundItem && isHUscan && scannedHUs.has(code)) {
-            showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
-            return;
-        }
+         console.log(`Scan: ${code}, Brunswick: ${isBrunswick}, MultiItemHU: ${isMultiItemHu}, AssociatedItems: ${associatedItemNos}`);
 
-        if (foundItem) {
-            const progressKey = `${foundItem.material}-${foundItem.item_no}`;
-            const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
-            if (!scanTextEl) {
-                 console.error(`Elemen progress text tidak ditemukan untuk key: ${progressKey}`);
-                 showAlert('Error Internal', 'Komponen UI tidak ditemukan. Coba refresh.', 'error');
+        if (isMultiItemHu) {
+             // --- LOGIKA KHUSUS MULTI-ITEM HU BRUNSWICK ---
+             isHUscan = true;
+             console.log(`HU ${code} adalah multi-item untuk Brunswick.`);
+
+             if (scannedHUs.has(code)) {
+                 showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
                  return;
-            }
-            let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
+             }
 
-            // --- PERBAIKAN LOGIKA QTY UNTUK BRUNSWICK ---
-            const customerName = currentDOData.customer || ''; // Ambil nama customer
-            const isBrunswick = customerName.toLowerCase().includes('brunswick'); // Cek apakah Brunswick
+             affectedItems = currentDOData.items.filter(item => {
+                 return item.item_no !== undefined && item.item_no !== null && associatedItemNos.includes(String(item.item_no));
+             });
 
-            if (isHUscan) {
-                if (isBrunswick) {
-                    // Logika Brunswick: Jumlahkan SEMUA qty_hu yang cocok dengan HU
-                    scanQtyToAdd = huDetails.reduce((sum, detail) => sum + (detail.qty_hu || 0), 0);
-                    console.log(`Pelanggan Brunswick, HU ${code}, total qty dihitung: ${scanQtyToAdd}`);
-                } else {
-                    // Logika Pelanggan Lain: Ambil qty_hu dari baris pertama saja
-                    scanQtyToAdd = huDetails[0]?.qty_hu || 0;
-                     console.log(`Pelanggan Lain, HU ${code}, qty diambil: ${scanQtyToAdd}`);
-                }
+             if (affectedItems.length === 0) {
+                  showAlert('Error Internal', `Item terkait (${associatedItemNos.join(', ')}) untuk multi-item HU ${code} tidak ditemukan.`, 'error');
+                  console.error("Item tidak ditemukan untuk associatedItemNos:", associatedItemNos, "di currentDOData.items:", currentDOData.items);
+                  return;
+             }
+             foundItem = affectedItems[0];
+             batchNumber = foundItem.hu_details?.find(d => d.hu_no === code)?.charg2 || null;
 
-                 if (scanQtyToAdd === 0) {
-                     console.warn("Total qty_hu untuk HU yang dipindai adalah 0.", huDetails);
-                     showAlert('Info', `Kuantitas untuk HU ${code} adalah 0. Tidak ada yang ditambahkan.`, 'info');
-                     scannedHUs.add(code);
-                     updateHUDetailView();
+             console.log(`HU ${code} mempengaruhi ${affectedItems.length} item:`, affectedItems.map(i => i.item_no));
+
+             scannedHUs.add(code);
+             let allItemsUpdated = true;
+             let itemsToSave = [];
+
+             affectedItems.forEach(item => {
+                 const progressKey = `${item.material}-${item.item_no}`;
+                 const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
+                 if (!scanTextEl) {
+                     console.error(`Elemen progress text ${progressKey} tidak ditemukan untuk multi-item HU.`);
+                     allItemsUpdated = false;
                      return;
                  }
-            }
-            // Jika bukan HU (scan batch), scanQtyToAdd tetap 1 (sudah di-default)
-            // --- AKHIR PERBAIKAN LOGIKA QTY ---
+                 let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
-            if (currentScan + scanQtyToAdd <= qtyOrder) {
-                currentScan += scanQtyToAdd;
-                if (isHUscan) {
-                    scannedHUs.add(code);
-                }
+                 // --- PERBAIKAN: Set currentScan ke qtyOrder, hitung qtyToAdd ---
+                 const qtyToAddForThisItem = Math.max(0, qtyOrder - currentScan); // Qty yg ditambahkan agar jadi = qtyOrder
+                 currentScan = qtyOrder; // Langsung set selesai
 
-                showAlert('Berhasil!', `Item ${foundItem.material} (${foundItem.item_no}) discan (+${scanQtyToAdd}).`, 'success');
-                saveScanToDatabase({
-                    do_number: currentDOData.do_number,
-                    material_number: foundItem.material,
-                    item_number: foundItem.item_no,
-                    scanned_code: originalBarcode,
-                    batch_number: batchNumber,
-                    qty_scanned: scanQtyToAdd
-                });
+                 console.log(`Memproses item ${item.item_no}: currentScan=${currentScan}, qtyOrder=${qtyOrder}, qtyToAddForThisItem=${qtyToAddForThisItem}`);
 
-                scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
-                updateProgressBarColor(progressKey, currentScan, qtyOrder);
+                 scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
+                 // Panggil updateProgressBarColor SETELAH textContent diubah
+                 updateProgressBarColor(progressKey, currentScan, qtyOrder);
 
-                updateSummary();
-                if(isHUscan) updateHUDetailView();
-            } else {
-                 showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}) untuk item ${foundItem.item_no}.`, 'warning');
-            }
+
+                 itemsToSave.push({
+                     do_number: currentDOData.do_number,
+                     material_number: item.material,
+                     item_number: String(item.item_no),
+                     scanned_code: originalBarcode,
+                     batch_number: batchNumber,
+                     qty_scanned: qtyToAddForThisItem // Kirim qty yang ditambahkan saja
+                 });
+             });
+
+             if (allItemsUpdated && itemsToSave.length > 0) {
+                  showAlert('Berhasil!', `Multi-item HU ${code} discan, ${affectedItems.length} item diperbarui.`, 'success');
+                  itemsToSave.forEach(scanData => saveScanToDatabase(scanData));
+             } else if (!allItemsUpdated) {
+                  showAlert('Error Sebagian', `Multi-item HU ${code} discan, namun beberapa item gagal diperbarui.`, 'warning');
+             }
+
+             updateSummary();
+             updateHUDetailView();
+
         } else {
-            showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di item DO ini.`, 'error');
+             // --- LOGIKA SCAN BIASA (BATCH ATAU SINGLE-ITEM HU) ---
+             console.log(`Memproses scan biasa untuk ${code}.`);
+             for (const item of currentDOData.items) {
+                 if (item.is_hu && item.hu_details) {
+                      const matchingHuDetails = item.hu_details.filter(d => d.hu_no === code);
+                      if (matchingHuDetails.length > 0) {
+                          foundItem = item;
+                          isHUscan = true;
+                          huDetails = matchingHuDetails;
+                          batchNumber = huDetails[0].charg2;
+                          break;
+                      }
+                 }
+                 if (!item.is_hu && item.batch_no === code) {
+                     foundItem = item;
+                     isHUscan = false;
+                     scanQtyToAdd = 1;
+                     batchNumber = item.batch_no;
+                     break;
+                 }
+             }
+
+             if (foundItem && isHUscan && scannedHUs.has(code)) {
+                 showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
+                 return;
+             }
+
+             if (foundItem) {
+                 const progressKey = `${foundItem.material}-${foundItem.item_no}`;
+                 const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
+                 if (!scanTextEl) {
+                      console.error(`Elemen progress text tidak ditemukan untuk key: ${progressKey}`);
+                      showAlert('Error Internal', 'Komponen UI tidak ditemukan. Coba refresh.', 'error');
+                      return;
+                 }
+                 let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
+
+                 if (isHUscan) {
+                     if (isBrunswick) {
+                         scanQtyToAdd = huDetails.reduce((sum, detail) => sum + (detail.qty_hu || 0), 0);
+                         console.log(`Single HU Brunswick ${code}, total qty: ${scanQtyToAdd}`);
+                     } else {
+                         scanQtyToAdd = huDetails[0]?.qty_hu || 0;
+                          console.log(`Single HU Lain ${code}, qty: ${scanQtyToAdd}`);
+                     }
+                      if (scanQtyToAdd === 0) {
+                          console.warn("Qty untuk HU adalah 0.", huDetails);
+                          showAlert('Info', `Kuantitas untuk HU ${code} adalah 0.`, 'info');
+                          scannedHUs.add(code);
+                          updateHUDetailView();
+                          return;
+                      }
+                 }
+                 // Jika batch, scanQtyToAdd tetap 1
+
+                 if (currentScan + scanQtyToAdd <= qtyOrder) {
+                     // --- PERBAIKAN: Simpan nilai currentScan SEBELUM ditambah ---
+                     const qtyToAddForThisScan = scanQtyToAdd;
+                     currentScan += scanQtyToAdd; // Baru update currentScan
+                     // --- Akhir Perbaikan ---
+
+                     if (isHUscan) {
+                         scannedHUs.add(code);
+                     }
+
+                     showAlert('Berhasil!', `Item ${foundItem.material} (${foundItem.item_no}) discan (+${qtyToAddForThisScan}).`, 'success');
+                     saveScanToDatabase({ // Simpan satu record
+                         do_number: currentDOData.do_number,
+                         material_number: foundItem.material,
+                         item_number: String(foundItem.item_no),
+                         scanned_code: originalBarcode,
+                         batch_number: batchNumber,
+                         qty_scanned: qtyToAddForThisScan // Kirim qty yang ditambahkan di scan ini
+                     });
+
+                     scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
+                     // Panggil updateProgressBarColor SETELAH textContent diubah
+                     updateProgressBarColor(progressKey, currentScan, qtyOrder);
+
+
+                     updateSummary();
+                     if(isHUscan) updateHUDetailView();
+                 } else {
+                      showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}) untuk item ${foundItem.item_no}.`, 'warning');
+                 }
+             } else {
+                 showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di item DO ini.`, 'error');
+             }
         }
     }
 
 
      function updateHUDetailView() {
-        scannedHUs.forEach(huNum => {
+          scannedHUs.forEach(huNum => {
             document.querySelectorAll(`.details-table tbody tr[data-hu-number="${huNum}"]`).forEach(row => {
                 row.classList.add('hu-scanned');
                 const statusCell = row.querySelector('.scan-status-cell');
@@ -722,21 +831,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function saveScanToDatabase(scanData) {
-        try {
+         try {
             await fetchWithTimeout('{{ route("do.verify.scan") }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                body: JSON.stringify(scanData)
+                body: JSON.stringify(scanData) // Kirim data tunggal
             });
             console.log('Scan berhasil disimpan ke DB:', scanData);
         } catch (error) {
             console.error('Gagal menyimpan scan ke DB:', error.message);
-            showAlert('Gagal Simpan', 'Gagal menyimpan data scan ke server. Perubahan mungkin tidak tersimpan.', 'error');
+            if (error.message && error.message.includes('array')) {
+                 showAlert('Error Validasi', 'Data item number tidak valid. Coba refresh halaman.', 'error');
+            } else {
+                showAlert('Gagal Simpan', 'Gagal menyimpan data scan ke server. Perubahan mungkin tidak tersimpan.', 'error');
+            }
         }
     }
 
+
     function updateSummary() {
-         let totalOrder = 0; let totalScanned = 0;
+          let totalOrder = 0; let totalScanned = 0;
         if (!currentDOData || !currentDOData.items) return;
 
         currentDOData.items.forEach(item => {
@@ -767,7 +881,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     async function triggerEmailNotification() {
-        try {
+          try {
             if (!currentDOData || !currentDOData.do_number) {
                  console.error("Tidak bisa mengirim notifikasi, data DO tidak lengkap.");
                  return;
@@ -785,12 +899,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     function isNumeric(str) {
-        if (typeof str != "string") return false
+         if (typeof str != "string") return false
         return !isNaN(str) && !isNaN(parseFloat(str))
     }
 
     // --- EVENT LISTENERS ---
-    btnSearchDO.addEventListener('click', searchDO);
+     btnSearchDO.addEventListener('click', searchDO);
     doNumberInput.addEventListener('keypress', (e) => e.key === 'Enter' && searchDO());
 
     pickingListBody.addEventListener('click', function(event) {
@@ -832,7 +946,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- LOGIKA KAMERA ---
-     btnCameraScan.addEventListener('click', () => {
+      btnCameraScan.addEventListener('click', () => {
         cameraScannerModal.show();
     });
 

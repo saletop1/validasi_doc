@@ -18,7 +18,7 @@ use Illuminate\Support\Collection; // Import Collection
 
 class DeliveryOrderController extends Controller
 {
-    // ... (fungsi verifyIndex, historyIndex, getScannedItemsForDO, search tidak berubah) ...
+    // ... (fungsi verifyIndex, historyIndex, getScannedItemsForDO, search, saveSapDataToLocal tidak berubah) ...
      public function verifyIndex()
     {
         return view('delivery-order.verify');
@@ -62,53 +62,69 @@ class DeliveryOrderController extends Controller
             // 1. Ambil item DO unik berdasarkan MATNR, sum LFIMG, ambil deskripsi pertama
             $doListItemsGrouped = DB::table('do_list')
                 ->where('VBELN', $doNumber)
-                ->select('MATNR', DB::raw('MIN(MAKTX) as description'), DB::raw('SUM(LFIMG) as total_qty_order'))
+                 // Ambil POSNR pertama untuk referensi jika diperlukan
+                ->select('MATNR', DB::raw('MIN(MAKTX) as description'), DB::raw('MIN(POSNR) as item_no'), DB::raw('SUM(LFIMG) as total_qty_order'))
                 ->groupBy('MATNR') // Group hanya berdasarkan Material Number
                 ->orderBy('MATNR', 'asc')
                 ->get();
 
-            // 2. Ambil total scan per material_number
+            // 2. Ambil total scan per item (material + posnr)
             $scannedData = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
-                ->select('material_number', DB::raw('SUM(qty_scanned) as total_qty_scan'))
-                ->groupBy('material_number')
+                ->select('material_number', 'item_number', DB::raw('SUM(qty_scanned) as total_qty_scan')) // Gunakan item_number (POSNR)
+                ->groupBy('material_number', 'item_number') // Group berdasarkan Material DAN POSNR
                 ->get();
 
             // 3. Buat peta (Map) dari data scan untuk pencocokan cepat
+            //    Kunci PETA = "MATNR(formatted)-POSNR(formatted)"
             $scannedCountsMap = collect($scannedData)->mapWithKeys(function ($item) {
                 $materialNumber = $item->material_number ?? null;
-                if ($materialNumber === null) return [];
-                $key = ctype_digit((string)$materialNumber) ? ltrim($materialNumber, '0') : $materialNumber;
-                return [$key => (int)$item->total_qty_scan];
+                $itemNumber = $item->item_number ?? null; // item_number adalah POSNR
+                if ($materialNumber === null || $itemNumber === null) return [];
+                // Format kunci
+                $matKey = ctype_digit((string)$materialNumber) ? ltrim($materialNumber, '0') : $materialNumber;
+                $itemKey = ctype_digit((string)$itemNumber) ? ltrim($itemNumber, '0') : $itemNumber;
+                return [$matKey . '-' . $itemKey => (int)$item->total_qty_scan];
             });
 
 
             $totalOrder = 0;
             $totalScan = 0;
 
-            // 4. Gabungkan data
-            $results = $doListItemsGrouped->map(function ($item, $key) use ($scannedCountsMap, &$totalOrder, &$totalScan, $doNumber) { // Tambahkan $doNumber untuk logging
+            // 4. Gabungkan data (berdasarkan MATNR grouping dari langkah 1)
+            $results = $doListItemsGrouped->map(function ($item, $key) use ($scannedCountsMap, &$totalOrder, &$totalScan, $doNumber) {
                 $matnr = $item->MATNR ?? null;
-                if ($matnr === null) {
-                    Log::warning('MATNR null ditemukan di do_list saat grouping.', ['do_number' => $doNumber]);
+                $posnr = $item->item_no ?? null; // Ambil POSNR pertama dari hasil group
+                if ($matnr === null || $posnr === null) {
+                    Log::warning('MATNR atau POSNR null ditemukan di do_list saat grouping.', ['do_number' => $doNumber]);
                     return null;
                 }
+                // Format kunci untuk lookup di peta scan
                 $materialKeyFormatted = ctype_digit((string)$matnr) ? ltrim($matnr, '0') : $matnr;
-                $qtyScan = $scannedCountsMap->get($materialKeyFormatted, 0);
+                $itemKeyFormatted = ctype_digit((string)$posnr) ? ltrim($posnr, '0') : $posnr;
+                $lookupKey = $materialKeyFormatted . '-' . $itemKeyFormatted;
+
+                 // Ambil total scan dari peta MENGGUNAKAN KUNCI KOMBINASI
+                 $qtyScan = $scannedCountsMap->get($lookupKey, 0);
+
 
                 $itemData = [
                     'no' => $key + 1,
-                    'material_number' => $materialKeyFormatted,
+                    'material_number' => $materialKeyFormatted, // Tampilkan yg sudah diformat
                     'description' => $item->description ?? 'N/A',
-                    'qty_order' => (int)$item->total_qty_order,
+                    'qty_order' => (int)$item->total_qty_order, // Total Qty Order per Material
                     'qty_scan' => $qtyScan,
                 ];
 
                 $totalOrder += $itemData['qty_order'];
-                $totalScan += $itemData['qty_scan'];
+                // $totalScan += $itemData['qty_scan']; // Total scan akan dihitung ulang di bawah
 
                 return $itemData;
-            })->filter(); // Hapus item yang null
+            })->filter();
+
+            // Hitung ulang Total Scan berdasarkan SUM dari hasil map agar lebih akurat untuk summary
+            $totalScan = $scannedCountsMap->sum();
+
 
             if ($results->isEmpty() && !$doListItemsGrouped->isEmpty()) {
                  Log::warning('Hasil penggabungan detail riwayat kosong.', ['do_number' => $doNumber]);
@@ -178,7 +194,6 @@ class DeliveryOrderController extends Controller
                  return response()->json(['success' => false, 'message' => "Data untuk DO {$doNumber} tidak ditemukan di SAP."], 404);
              }
 
-             // Simpan data ke lokal SETELAH memastikan data SAP tidak kosong
              $this->saveSapDataToLocal($doNumber, $tData, $tData2);
 
 
@@ -187,7 +202,6 @@ class DeliveryOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Tidak dapat terhubung ke server SAP/Python.'], 500);
         }
 
-         // --- Bagian Pengambilan Data Lokal (setelah data SAP disimpan) ---
          try {
              $doHeader = DB::table('do_list')
                  ->where('VBELN', $doNumber)
@@ -223,6 +237,19 @@ class DeliveryOrderController extends Controller
 
              $huMapByPosnr = $allHuDetails->groupBy('ITEM');
 
+             $multiItemHuMap = collect($allHuDetails)
+                ->groupBy('hu_no')
+                ->filter(function ($details) {
+                    return $details->pluck('ITEM')->unique()->count() > 1;
+                })
+                ->map(function ($details) {
+                     // Simpan POSNR (ITEM) yang sudah diformat (ltrim)
+                    return $details->pluck('ITEM')->map(function($posnr){
+                         return ctype_digit((string)$posnr) ? ltrim($posnr, '0') : $posnr;
+                    })->unique()->values()->all();
+                });
+
+
              $formattedItems = $doItems->map(function ($item) use ($huMapByPosnr) {
                  $posnrKey = $item->item_no;
                  if ($posnrKey === null) return null;
@@ -246,7 +273,7 @@ class DeliveryOrderController extends Controller
                      'material' => $material,
                      'description' => $item->MAKTX ?? 'N/A',
                      'do_no' => $item->do_no,
-                     'item_no' => $itemNo,
+                     'item_no' => $itemNo, // Ini adalah POSNR (sudah di-ltrim)
                      'batch_no' => $item->batch_no,
                      'qty_order' => (int)$item->qty_order,
                      'is_hu' => $huDetailsForItem->isNotEmpty(),
@@ -296,6 +323,11 @@ class DeliveryOrderController extends Controller
                  'container_no' => $containerInfo->V_NO_CONT ?? null,
                  'items' => $formattedItems,
                  'progress' => $progress,
+                 // --- PERBAIKAN: Kirim Peta Multi-Item HU dengan kunci HU yang sudah diformat ---
+                 'multiItemHuMap' => $multiItemHuMap->mapWithKeys(function ($itemNos, $huNo) {
+                      $formattedHu = ctype_digit((string)$huNo) ? ltrim($huNo, '0') : $huNo;
+                      return [$formattedHu => $itemNos];
+                  })->toArray(),
              ];
 
              return response()->json(['success' => true, 'data' => $data]);
@@ -308,7 +340,8 @@ class DeliveryOrderController extends Controller
 
     private function saveSapDataToLocal(string $doNumber, array $tData, array $tData2): void
     {
-        DB::transaction(function () use ($doNumber, $tData, $tData2) {
+        // ... (fungsi saveSapDataToLocal tidak berubah) ...
+         DB::transaction(function () use ($doNumber, $tData, $tData2) {
              if (!empty($tData)) {
                  DB::table('do_list')->where('VBELN', $doNumber)->delete();
              }
@@ -357,7 +390,7 @@ class DeliveryOrderController extends Controller
                          Log::warning('Data T_DATA2 dari SAP tidak lengkap (EXIDV/ITEM kosong). Baris dilewati.', ['do_number' => $doNumber, 'detail' => $detail]);
                          continue;
                      }
-                    // --- PERBAIKAN: Menambahkan CHARG2 (Batch) ke kunci unik ---
+                    // Kunci unik sekarang HU + Item + Batch
                     $combinationKey = ($detail['EXIDV'] ?? '') . '-' . ($detail['ITEM'] ?? '') . '-' . ($detail['CHARG2'] ?? '');
                     if (!isset($seenCombinations[$combinationKey])) {
                         $uniqueHuDetails[] = [
@@ -370,16 +403,15 @@ class DeliveryOrderController extends Controller
                             'MAKTX' => $detail['MAKTX'] ?? null,
                             'BSTKD' => $detail['BSTKD'] ?? null,
                             'V_NO_CONT' => $detail['V_NO_CONT'] ?? null,
-                            'CHARG2' => $detail['CHARG2'] ?? null, // Nomor Batch
-                            'EXIDV' => $detail['EXIDV'] ?? null,   // Nomor HU
-                            'VEMNG' => (float)($detail['VEMNG'] ?? 0), // Qty HU (mungkin perlu disesuaikan jika per batch)
+                            'CHARG2' => $detail['CHARG2'] ?? null,
+                            'EXIDV' => $detail['EXIDV'] ?? null,
+                            'VEMNG' => (float)($detail['VEMNG'] ?? 0),
                             'VEMEH' => $detail['VEMEH'] ?? null,
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
                         $seenCombinations[$combinationKey] = true;
                     } else {
-                        // Log jika ada duplikasi berdasarkan kunci baru (opsional)
                         Log::debug('Kombinasi HU-Item-Batch duplikat terdeteksi dan dilewati saat menyimpan T_DATA2.', [
                             'do_number' => $doNumber,
                             'hu' => $detail['EXIDV'] ?? 'N/A',
@@ -395,38 +427,44 @@ class DeliveryOrderController extends Controller
         });
     }
 
-    // ... (fungsi scan, sendCompletionEmail tidak berubah) ...
-     public function scan(Request $request)
+    public function scan(Request $request)
     {
         try {
+            // --- PERBAIKAN: Validasi item_number kembali ke string ---
             $validated = $request->validate([
                 'do_number' => 'required|string',
                 'material_number' => 'required|string',
                 'scanned_code' => 'required|string',
                 'batch_number' => 'nullable|string',
-                'item_number' => 'required|string',
-                'qty_scanned' => 'required|integer|min:1'
+                'item_number' => 'required|string', // Hanya string
+                'qty_scanned' => 'required|integer|min:0' // Izinkan 0 untuk multi-item
             ]);
 
+            // --- PERBAIKAN: Hapus logika array, simpan langsung ---
             DB::table('scanned_items')->insert([
                 'do_number' => $validated['do_number'],
-                'item_number' => $validated['item_number'],
+                'item_number' => $validated['item_number'], // Simpan POSNR
                 'material_number' => $validated['material_number'],
                 'scanned_code' => $validated['scanned_code'],
                 'batch_number' => $validated['batch_number'],
-                'qty_scanned' => $validated['qty_scanned'],
+                'qty_scanned' => $validated['qty_scanned'], // Qty dari scan
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
             return response()->json(['success' => true, 'message' => 'Scan berhasil disimpan.']);
         } catch (Throwable $e) {
-            Log::error('Error saat menyimpan scan: ' . $e->getMessage());
+            Log::error('Error saat menyimpan scan: ' . $e->getMessage(), [
+                'request_data' => $request->all() // Log data request jika error
+            ]);
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan data scan.'], 500);
         }
     }
+
+
     public function sendCompletionEmail(Request $request)
     {
+        // ... (fungsi sendCompletionEmail tidak berubah) ...
         $validated = $request->validate(['do_number' => 'required|string']);
         $doNumber = $validated['do_number'];
 
@@ -472,5 +510,5 @@ class DeliveryOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Gagal memicu pengiriman email.'], 500);
         }
     }
+}
 
-} // Akhir Class Controller
