@@ -168,7 +168,7 @@ class DeliveryOrderController extends Controller
         }
 
         try {
-            $response = Http::timeout(60)->post('http://127.0.0.1:5002/api/sap/get_do_details', [
+            $response = Http::timeout(60)->post('http://127.0.0.1:8009/api/sap/get_do_details', [
                 'username' => 'auto_email',
                 'password' => '11223344',
                 'P_VBELN' => $doNumber,
