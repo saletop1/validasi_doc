@@ -249,7 +249,7 @@
 <div class="container-fluid py-4">
     <div class="card main-card">
         <div class="card-header card-header-custom d-flex justify-content-between align-items-center flex-wrap">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi Dokumen Delivery Order</h2>
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan DO</h2>
             @auth
             <div class="d-flex align-items-center mt-2 mt-md-0">
                 <span class="text-white me-3 d-none d-md-inline">Selamat datang, <strong>{{ Auth::user()->name }}</strong></span>
@@ -265,7 +265,7 @@
             <div class="row justify-content-center align-items-end mb-4">
                 <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        {{-- <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label> --}}
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
@@ -397,10 +397,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const pickingListBody = document.getElementById('picking-list-body');
     const doDetailsSection = document.getElementById('do-details');
     const loader = document.getElementById('loader');
-    const filterInput = document.getElementById('item-filter-input'); // Perbaiki ID filter input
+    const filterInput = document.getElementById('item-filter-input');
 
     const btnCameraScan = document.getElementById('btn-camera-scan');
-    const cameraScannerModalElement = document.getElementById('cameraScannerModal'); // Simpan elemen modal
+    const cameraScannerModalElement = document.getElementById('cameraScannerModal');
     const cameraScannerModal = new bootstrap.Modal(cameraScannerModalElement);
     let html5QrcodeScanner;
     let isScanCooldown = false;
@@ -416,50 +416,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Fungsi fetch dengan Timeout dan Penanganan Error Auth
-    async function fetchWithTimeout(resource, options = {}, timeout = 30000) { // Timeout 30 detik
+    async function fetchWithTimeout(resource, options = {}, timeout = 30000) {
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), timeout);
-
         try {
-            const response = await fetch(resource, {
-                ...options,
-                signal: controller.signal
-            });
-
-            clearTimeout(id); // Hapus timer jika fetch berhasil
-
-            // Cek jika sesi habis (dari middleware Authenticate)
+            const response = await fetch(resource, { ...options, signal: controller.signal });
+            clearTimeout(id);
             if (response.status === 401 || response.status === 419) {
                 showAlert('Sesi Habis', 'Sesi Anda telah berakhir. Silakan login kembali.', 'warning', 3000);
-                setTimeout(() => {
-                    window.location.href = "{{ route('login') }}";
-                }, 3000);
-                throw new Error('Unauthenticated'); // Hentikan proses selanjutnya
+                setTimeout(() => { window.location.href = "{{ route('login') }}"; }, 3000);
+                throw new Error('Unauthenticated');
             }
-
-            // Cek error server lainnya
             if (!response.ok) {
                 let errorData;
-                try {
-                    errorData = await response.json();
-                } catch(e) {
-                    errorData = { message: `HTTP error! status: ${response.status}` };
-                }
+                try { errorData = await response.json(); } catch(e) { errorData = { message: `HTTP error! status: ${response.status}` }; }
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
-
-            // Jika respons OK
             return response;
-
         } catch (error) {
-            clearTimeout(id); // Pastikan timer dihapus jika ada error
+            clearTimeout(id);
             if (error.name === 'AbortError') {
                 showAlert('Timeout', 'Permintaan ke server memakan waktu terlalu lama. Silakan coba lagi.', 'error', 3000);
             } else if (error.message !== 'Unauthenticated') {
                  showAlert('Error', `Terjadi kesalahan: ${error.message}`, 'error', 3000);
             }
-            throw error; // Lempar error agar promise di pemanggil ditolak
+            throw error;
         }
     }
 
@@ -514,6 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayDODetails() {
         if (!currentDOData) return;
         const savedProgress = currentDOData.progress;
+        savedProgress.counts = savedProgress.counts || {};
         scannedHUs = new Set(savedProgress.hus || []);
 
         document.getElementById('customer-name').textContent = currentDOData.customer || 'T/A';
@@ -526,30 +508,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
         pickingListBody.innerHTML = '';
         currentDOData.items.forEach((item, index) => {
-            const uniqueId = `${item.material}-${item.item_no}`;
-            const savedScanCount = savedProgress.counts[uniqueId] || 0;
+            if (item.item_no === undefined || item.item_no === null) {
+                console.error("Item tidak memiliki item_no:", item);
+                return;
+            }
+            const progressKey = `${item.material}-${item.item_no}`;
+            const savedScanCount = savedProgress.counts[progressKey] || 0;
 
-            let batchHuCellHtml = item.is_hu ? `${item.hu_details.length} HU` : item.batch_no;
+            let batchHuCellHtml = item.batch_no || '';
+            let huCount = 0;
+            if (item.is_hu && item.hu_details) {
+                 const uniqueHus = new Set(item.hu_details.map(d => d.hu_no));
+                 huCount = uniqueHus.size;
+                 batchHuCellHtml = `${huCount} HU`;
+            }
+
             let detailRowsHtml = '';
-
-            if (item.is_hu) {
+            if (item.is_hu && item.hu_details) {
                 detailRowsHtml = item.hu_details.map(detail => {
                     const isScanned = scannedHUs.has(detail.hu_no);
-                    return `<tr class="${isScanned ? 'hu-scanned' : ''}">
-                                <td>${detail.delivery}</td>
-                                <td>${detail.item}</td>
-                                <td>${detail.hu_no}</td>
-                                <td>${detail.item_hu}</td>
-                                <td>${detail.charg2}</td>
-                                <td class="text-center">${detail.qty_hu}</td>
-                                <td class="text-center">${isScanned ? '<i class="fas fa-check-circle text-success scan-status-icon"></i>' : ''}</td>
+                    const huNumberDisplay = detail.hu_no || 'N/A';
+                    return `<tr class="${isScanned ? 'hu-scanned' : ''}" data-hu-number="${huNumberDisplay}">
+                                <td>${detail.delivery || 'N/A'}</td>
+                                <td>${detail.item || 'N/A'}</td>
+                                <td>${huNumberDisplay}</td>
+                                <td>${detail.item_hu || 'N/A'}</td>
+                                <td>${detail.charg2 || 'N/A'}</td>
+                                <td class="text-center">${detail.qty_hu || 0}</td>
+                                <td class="text-center scan-status-cell">${isScanned ? '<i class="fas fa-check-circle text-success scan-status-icon"></i>' : ''}</td>
                             </tr>`;
                 }).join('');
             }
 
             const mainRowClass = item.is_hu ? 'main-item-row has-details' : 'main-item-row';
             const mainRowHtml = `
-                <tr class="${mainRowClass}" id="main-row-${index}">
+                <tr class="${mainRowClass}" id="main-row-${item.item_no}" data-item-no="${item.item_no}">
                     <td class="text-center">${index + 1}</td>
                     <td class="material-cell">
                         <strong>${item.material}</strong><br>
@@ -561,22 +554,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="text-center fw-bold">${item.qty_order}</td>
                     <td>
                         <div class="progress-container">
-                             <div class="progress-bar-scan" id="progressbar-${uniqueId}" style="width: 0%;"></div>
-                             <div class="progress-text" id="progresstext-${uniqueId}">${savedScanCount} / ${item.qty_order}</div>
+                             <div class="progress-bar-scan" id="progressbar-${progressKey}" style="width: 0%;"></div>
+                             <div class="progress-text" id="progresstext-${progressKey}">${savedScanCount} / ${item.qty_order}</div>
                         </div>
                     </td>
                 </tr>`;
 
-            const detailsHtml = item.is_hu ? `
+            const detailsHtml = (item.is_hu && item.hu_details && item.hu_details.length > 0) ? `
                 <tr class="details-row" style="display: none;">
                     <td colspan="7">
                         <div class="details-table-wrapper">
-                            <h6 class="mb-3">Rincian Handling Units (HU) untuk ${item.material}</h6>
+                            <h6 class="mb-3">Rincian Handling Units (HU) untuk ${item.material} / Item ${item.item_no}</h6>
                             <table class="table table-bordered table-sm details-table">
                                 <thead>
                                     <tr>
                                     <th>Delivery</th>
-                                    <th>Item</th>
+                                    <th>Item DO</th>
                                     <th>HU Number</th>
                                     <th>Item HU</th>
                                     <th>Batch</th>
@@ -591,14 +584,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tr>` : '';
 
             pickingListBody.innerHTML += mainRowHtml + detailsHtml;
-            updateProgressBarColor(uniqueId, savedScanCount, item.qty_order);
+            updateProgressBarColor(progressKey, savedScanCount, item.qty_order);
         });
         updateSummary();
         updateHUDetailView();
     }
 
-    function updateProgressBarColor(uniqueId, currentScan, qtyOrder) {
-        const progressBar = document.getElementById(`progressbar-${uniqueId}`);
+
+    function updateProgressBarColor(progressKey, currentScan, qtyOrder) {
+         const progressBar = document.getElementById(`progressbar-${progressKey}`);
         if (!progressBar) return;
 
         const progressPercent = qtyOrder > 0 ? (currentScan / qtyOrder) * 100 : 0;
@@ -621,49 +615,77 @@ document.addEventListener('DOMContentLoaded', function() {
         let foundItem = null;
         let isHUscan = false;
         let batchNumber = null;
-        let scanQtyToAdd = 1; // Default jika bukan HU
+        let scanQtyToAdd = 1;
+        let huDetails = [];
 
         for (const item of currentDOData.items) {
-            if (item.is_hu) {
-                const foundHU = item.hu_details.find(d => d.hu_no === code);
-                if (foundHU) {
-                    foundItem = item;
-                    isHUscan = true;
-                    batchNumber = foundHU.charg2;
-                    scanQtyToAdd = foundHU.qty_hu; // Gunakan Qty dari HU
-                    break;
-                }
+            if (item.is_hu && item.hu_details) {
+                 const matchingHuDetails = item.hu_details.filter(d => d.hu_no === code);
+                 if (matchingHuDetails.length > 0) {
+                     foundItem = item;
+                     isHUscan = true;
+                     huDetails = matchingHuDetails;
+                     batchNumber = huDetails[0].charg2;
+                     break;
+                 }
             }
-            // Hanya cocokkan batch jika item BUKAN HU
             if (!item.is_hu && item.batch_no === code) {
                 foundItem = item;
                 isHUscan = false;
+                scanQtyToAdd = 1;
                 batchNumber = item.batch_no;
-                scanQtyToAdd = 1; // Untuk batch, tambahkan 1
                 break;
             }
         }
 
-        // --- Cek duplikat HANYA untuk HU ---
         if (foundItem && isHUscan && scannedHUs.has(code)) {
-            showAlert('Duplikat!', `HU ${code} sudah pernah discan.`, 'warning');
-            return; // Hentikan proses jika HU duplikat
+            showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
+            return;
         }
-        // --- Akhir Cek Duplikat ---
 
         if (foundItem) {
-            const uniqueId = `${foundItem.material}-${foundItem.item_no}`;
-            const scanTextEl = document.getElementById(`progresstext-${uniqueId}`);
+            const progressKey = `${foundItem.material}-${foundItem.item_no}`;
+            const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
+            if (!scanTextEl) {
+                 console.error(`Elemen progress text tidak ditemukan untuk key: ${progressKey}`);
+                 showAlert('Error Internal', 'Komponen UI tidak ditemukan. Coba refresh.', 'error');
+                 return;
+            }
             let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
-            // Cek apakah penambahan akan melebihi qty order
+            // --- PERBAIKAN LOGIKA QTY UNTUK BRUNSWICK ---
+            const customerName = currentDOData.customer || ''; // Ambil nama customer
+            const isBrunswick = customerName.toLowerCase().includes('brunswick'); // Cek apakah Brunswick
+
+            if (isHUscan) {
+                if (isBrunswick) {
+                    // Logika Brunswick: Jumlahkan SEMUA qty_hu yang cocok dengan HU
+                    scanQtyToAdd = huDetails.reduce((sum, detail) => sum + (detail.qty_hu || 0), 0);
+                    console.log(`Pelanggan Brunswick, HU ${code}, total qty dihitung: ${scanQtyToAdd}`);
+                } else {
+                    // Logika Pelanggan Lain: Ambil qty_hu dari baris pertama saja
+                    scanQtyToAdd = huDetails[0]?.qty_hu || 0;
+                     console.log(`Pelanggan Lain, HU ${code}, qty diambil: ${scanQtyToAdd}`);
+                }
+
+                 if (scanQtyToAdd === 0) {
+                     console.warn("Total qty_hu untuk HU yang dipindai adalah 0.", huDetails);
+                     showAlert('Info', `Kuantitas untuk HU ${code} adalah 0. Tidak ada yang ditambahkan.`, 'info');
+                     scannedHUs.add(code);
+                     updateHUDetailView();
+                     return;
+                 }
+            }
+            // Jika bukan HU (scan batch), scanQtyToAdd tetap 1 (sudah di-default)
+            // --- AKHIR PERBAIKAN LOGIKA QTY ---
+
             if (currentScan + scanQtyToAdd <= qtyOrder) {
                 currentScan += scanQtyToAdd;
                 if (isHUscan) {
-                    scannedHUs.add(code); // Tambahkan HU ke set scannedHUs
+                    scannedHUs.add(code);
                 }
 
-                showAlert('Berhasil!', `Item ${foundItem.material} discan (+${scanQtyToAdd}).`, 'success');
+                showAlert('Berhasil!', `Item ${foundItem.material} (${foundItem.item_no}) discan (+${scanQtyToAdd}).`, 'success');
                 saveScanToDatabase({
                     do_number: currentDOData.do_number,
                     material_number: foundItem.material,
@@ -674,28 +696,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
-                updateProgressBarColor(uniqueId, currentScan, qtyOrder);
+                updateProgressBarColor(progressKey, currentScan, qtyOrder);
 
                 updateSummary();
                 if(isHUscan) updateHUDetailView();
             } else {
-                 showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}).`, 'warning');
+                 showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}) untuk item ${foundItem.item_no}.`, 'warning');
             }
         } else {
-            showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di DO ini.`, 'error');
+            showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di item DO ini.`, 'error');
         }
     }
 
+
      function updateHUDetailView() {
-        document.querySelectorAll('.details-table tbody tr').forEach(row => {
-            const huNumberCell = row.cells[2];
-            if (huNumberCell && huNumberCell.textContent && scannedHUs.has(huNumberCell.textContent.trim())) {
+        scannedHUs.forEach(huNum => {
+            document.querySelectorAll(`.details-table tbody tr[data-hu-number="${huNum}"]`).forEach(row => {
                 row.classList.add('hu-scanned');
-                const statusCell = row.cells[6];
+                const statusCell = row.querySelector('.scan-status-cell');
                 if (statusCell && !statusCell.querySelector('.fa-check-circle')) {
                     statusCell.innerHTML = '<i class="fas fa-check-circle text-success scan-status-icon"></i>';
                 }
-            }
+            });
         });
     }
 
@@ -714,19 +736,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateSummary() {
-        let totalOrder = 0; let totalScanned = 0;
+         let totalOrder = 0; let totalScanned = 0;
         if (!currentDOData || !currentDOData.items) return;
 
         currentDOData.items.forEach(item => {
-            const uniqueId = `${item.material}-${item.item_no}`;
-            const textElement = document.getElementById(`progresstext-${uniqueId}`);
+            if (item.item_no === undefined || item.item_no === null) return;
+            const progressKey = `${item.material}-${item.item_no}`;
+            const textElement = document.getElementById(`progresstext-${progressKey}`);
             if (textElement) {
                 totalOrder += item.qty_order;
                 const textContent = textElement.textContent || '0 / 0';
                 const scanned = parseInt(textContent.split(' / ')[0], 10) || 0;
                 totalScanned += scanned;
             } else {
-                console.warn(`Elemen progresstext-${uniqueId} tidak ditemukan.`);
+                console.warn(`Elemen progresstext-${progressKey} tidak ditemukan.`);
             }
         });
 
@@ -774,6 +797,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const mainRow = event.target.closest('.main-item-row.has-details');
         if (!mainRow) return;
 
+        const itemNo = mainRow.dataset.itemNo;
+        if (!itemNo) return;
+
         const detailsRow = mainRow.nextElementSibling;
 
         if (detailsRow && detailsRow.classList.contains('details-row')) {
@@ -782,10 +808,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+
     filterInput.addEventListener('keyup', function() {
         const filterText = this.value.toLowerCase();
         document.querySelectorAll('#picking-list-body .main-item-row').forEach(row => {
-            const rowText = row.querySelector('.material-cell').textContent.toLowerCase();
+            const materialCell = row.querySelector('.material-cell');
+            const itemCell = row.cells[3];
+            const rowText = (materialCell ? materialCell.textContent.toLowerCase() : '')
+                           + ' ' + (itemCell ? itemCell.textContent.toLowerCase() : '');
+
             const detailsRow = row.nextElementSibling;
 
             if (rowText.includes(filterText)) {
@@ -801,33 +832,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- LOGIKA KAMERA ---
-    // --- PERBAIKAN: Tombol hanya menampilkan modal ---
-    btnCameraScan.addEventListener('click', () => {
+     btnCameraScan.addEventListener('click', () => {
         cameraScannerModal.show();
     });
 
-    // --- PERBAIKAN: Memulai scanner hanya saat modal benar-benar tampil ---
     cameraScannerModalElement.addEventListener('shown.bs.modal', function () {
         startCameraScan();
     });
 
-    // --- PERBAIKAN: Menghentikan scanner saat modal ditutup ---
     cameraScannerModalElement.addEventListener('hidden.bs.modal', function () {
         stopCameraScan();
     });
 
     function startCameraScan() {
-        // Jangan mulai jika sudah berjalan
         if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
             console.log("Scanner sudah berjalan.");
             return;
         }
          try {
-            // Inisialisasi scanner di elemen #reader
             html5QrcodeScanner = new Html5Qrcode("reader");
             const config = { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true };
-
-            // Mulai scanner
             html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
                 .then(() => {
                     console.log("Scanner kamera dimulai.");
@@ -843,15 +867,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function stopCameraScan() {
-        // Hanya hentikan jika sedang berjalan
         if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
             html5QrcodeScanner.stop()
                 .then(() => {
                     console.log("Scanner kamera dihentikan.");
-                     // --- PERBAIKAN: Bersihkan elemen #reader setelah berhenti ---
                      const readerElement = document.getElementById('reader');
                      if(readerElement) readerElement.innerHTML = '';
-                     html5QrcodeScanner = null; // Reset instance scanner
+                     html5QrcodeScanner = null;
                 })
                 .catch(err => {
                     console.error("Gagal menghentikan scanner.", err);
@@ -867,15 +889,14 @@ document.addEventListener('DOMContentLoaded', function() {
         isScanCooldown = true;
         processScannedBarcode(decodedText);
         if (window.navigator.vibrate) { window.navigator.vibrate(100); }
-        cameraScannerModal.hide(); // Sembunyikan modal setelah scan berhasil
-        // Tidak perlu stop manual karena akan ditangani oleh event 'hidden.bs.modal'
+        cameraScannerModal.hide();
         setTimeout(() => { isScanCooldown = false; }, 1000);
     }
 
     function onScanFailure(error) {
-       // Biarkan kosong atau tambahkan log jika perlu
-       // console.warn(`Scan gagal, coba lagi.`);
+       // Biarkan kosong
     }
+
 });
 </script>
 @endpush
