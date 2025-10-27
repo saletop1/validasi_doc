@@ -113,7 +113,8 @@ class DeliveryOrderController extends Controller
 
             // Buat peta scan dengan kunci "MATNR(formatted)-POSNR(formatted)"
             $scannedCountsMap = collect($scannedData)->mapWithKeys(function ($item) {
-                $materialNumber = (string)($item->material_number ?? '');
+                // --- PERBAIKAN TYPO DI SINI ---
+                $materialNumber = (string)($item->material_number ?? ''); // Sebelumnya 'material_Number'
                 $itemNumber = (string)($item->item_number ?? ''); // POSNR
                 if ($materialNumber === '' || $itemNumber === '') return [];
 
@@ -141,7 +142,8 @@ class DeliveryOrderController extends Controller
                 $qtyScan = $scannedCountsMap->get($lookupKey, 0);
 
                 $itemData = [
-                    'no' => $key + 1, // Nomor urut berdasarkan index collection ($key)
+                    // --- PERBAIKAN: NOMOR URUT DI-AKTIFKAN KEMBALI DI SINI ---
+                    'no' => $key + 1, // Kita AKtifkan kembali, karena JS yang akan menangani
                     'material_number' => $materialKeyFormatted,
                     'description' => $item->description ?? 'N/A',
                     'qty_order' => (int)$item->qty_order,

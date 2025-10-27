@@ -526,7 +526,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const filterInput = document.getElementById('history-filter');
@@ -620,7 +620,10 @@
             modalContent.classList.add('d-none');
 
             try {
-                const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
+                // Tambahkan parameter unik untuk mencegah cache
+                const cacheBuster = new Date().getTime();
+                const url = `{{ url('/delivery-order/history/details') }}/${doNumber}?t=${cacheBuster}`;
+
                 const response = await fetch(url);
                 if (!response.ok) {
                     const errorJson = await response.json().catch(() => ({}));
@@ -646,16 +649,16 @@
                 const items = data.items;
                 if (items.length > 0) {
                     // ==========================================================
-                    // --- PERBAIKAN DI SINI ---
+                    // --- PERBAIKAN: Menggunakan item.no dari Controller ---
                     // ==========================================================
-                    items.forEach((item, index) => { // 1. Tambahkan ', index'
+                    items.forEach(item => { // 1. Hapus ', index'
                         const materialDisplay = /^[0-9]+$/.test(item.material_number) ? item.material_number.replace(/^0+/, '') : item.material_number;
                         const qtyOrder = parseInt(item.qty_order);
                         const qtyScan = parseInt(item.qty_scan);
                         const qtyClass = qtyOrder === qtyScan ? 'qty-match' : 'qty-mismatch';
 
-                        // 2. Ganti 'item.no' menjadi 'index + 1'
-                        const row = `<tr><td class="ps-4">${index + 1}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
+                        // 2. Ganti 'index + 1' kembali menjadi 'item.no'
+                        const row = `<tr><td class="ps-4">${item.no}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
                         modalTableBody.innerHTML += row;
                     });
                     // ==========================================================
@@ -765,3 +768,4 @@
     });
 </script>
 @endpush
+
