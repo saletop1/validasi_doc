@@ -645,14 +645,22 @@
 
                 const items = data.items;
                 if (items.length > 0) {
-                    items.forEach(item => {
+                    // ==========================================================
+                    // --- PERBAIKAN DI SINI ---
+                    // ==========================================================
+                    items.forEach((item, index) => { // 1. Tambahkan ', index'
                         const materialDisplay = /^[0-9]+$/.test(item.material_number) ? item.material_number.replace(/^0+/, '') : item.material_number;
                         const qtyOrder = parseInt(item.qty_order);
                         const qtyScan = parseInt(item.qty_scan);
                         const qtyClass = qtyOrder === qtyScan ? 'qty-match' : 'qty-mismatch';
-                        const row = `<tr><td class="ps-4">${item.no}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
+
+                        // 2. Ganti 'item.no' menjadi 'index + 1'
+                        const row = `<tr><td class="ps-4">${index + 1}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
                         modalTableBody.innerHTML += row;
                     });
+                    // ==========================================================
+                    // --- AKHIR PERBAIKAN ---
+                    // ==========================================================
                 } else {
                     modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-box-open fa-2x text-muted mb-2"></i><p class="text-muted mb-0">Tidak ada data scan ditemukan.</p></td></tr>`;
                 }
@@ -757,4 +765,3 @@
     });
 </script>
 @endpush
-

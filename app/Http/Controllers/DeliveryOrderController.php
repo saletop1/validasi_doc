@@ -59,7 +59,7 @@ class DeliveryOrderController extends Controller
 
     /**
      * Mengambil detail item yang sudah discan untuk sebuah DO, termasuk header.
-     * Mengelompokkan berdasarkan MATNR.
+     * Ditampilkan per baris item (POSNR) dan diurutkan berdasarkan POSNR.
      *
      * @param string $doNumber
      * @return \Illuminate\Http\JsonResponse
@@ -67,40 +67,34 @@ class DeliveryOrderController extends Controller
     public function getScannedItemsForDO($doNumber)
     {
         try {
-            // --- PERBAIKAN: Ambil data header DO ---
             $doHeader = DB::table('do_list')
                 ->where('VBELN', $doNumber)
-                ->select('NAME1 as customer', 'ADDRESS as address', 'SHIPTO as ship_to', 'VTEXT as shipping_point', 'BEZEI2 as ship_type', 'VERIFIED_AT') // Ambil kolom yang relevan
-                ->first(); // Ambil satu baris header saja
+                ->select('NAME1 as customer', 'ADDRESS as address', 'SHIPTO as ship_to', 'VTEXT as shipping_point', 'BEZEI2 as ship_type', 'VERIFIED_AT')
+                ->first();
 
              if (!$doHeader) {
                  Log::warning('Header DO tidak ditemukan di do_list untuk DO: ' . $doNumber);
-                 // Kembalikan error atau data kosong jika header tidak ada
                  return response()->json(['error' => 'Data header DO tidak ditemukan.'], 404);
              }
 
-             // Ambil nomor kontainer (coba cari yang tidak null)
              $containerInfo = DB::table('do_list_details')
                  ->where('DELV', $doNumber)
                  ->whereNotNull('V_NO_CONT')
                  ->select('V_NO_CONT')
                  ->first();
-             $doHeader->container_no = $containerInfo->V_NO_CONT ?? 'N/A'; // Tambahkan ke objek header
-            // --- Akhir Perbaikan ---
+             $doHeader->container_no = $containerInfo->V_NO_CONT ?? 'N/A';
 
 
-            // 1. Ambil item DO unik berdasarkan MATNR, sum LFIMG, ambil deskripsi pertama
-            $doListItemsGrouped = DB::table('do_list')
+            // Ambil setiap baris item unik dari do_list, urutkan by POSNR numerik
+            $doListItems = DB::table('do_list')
                 ->where('VBELN', $doNumber)
-                ->select('MATNR', DB::raw('MIN(MAKTX) as description'), DB::raw('SUM(LFIMG) as total_qty_order'))
-                ->groupBy('MATNR')
-                ->orderBy('MATNR', 'asc')
+                ->select('MATNR', 'MAKTX as description', 'POSNR', DB::raw('CAST(POSNR AS UNSIGNED) as posnr_int'), 'LFIMG as qty_order')
+                ->orderBy('posnr_int', 'asc') // Urutkan berdasarkan POSNR numerik
                 ->get();
 
-             // Jika tidak ada item DO sama sekali
-             if ($doListItemsGrouped->isEmpty()) {
+
+             if ($doListItems->isEmpty()) {
                  Log::warning('Tidak ada item ditemukan di do_list untuk DO: ' . $doNumber);
-                  // Tetap kirim header jika ada, tapi item kosong
                  return response()->json([
                      'header' => $doHeader,
                      'items' => [],
@@ -108,63 +102,70 @@ class DeliveryOrderController extends Controller
                  ]);
              }
 
-            // 2. Ambil total scan per material_number
+            // Ambil total scan per item (material + posnr)
             $scannedData = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
                 ->whereNotNull('material_number')
-                ->select('material_number', DB::raw('SUM(qty_scanned) as total_qty_scan'))
-                ->groupBy('material_number')
+                ->whereNotNull('item_number')
+                ->select('material_number', 'item_number', DB::raw('SUM(qty_scanned) as total_qty_scan'))
+                ->groupBy('material_number', 'item_number')
                 ->get();
 
-            // 3. Buat peta (Map) dari data scan
+            // Buat peta scan dengan kunci "MATNR(formatted)-POSNR(formatted)"
             $scannedCountsMap = collect($scannedData)->mapWithKeys(function ($item) {
                 $materialNumber = (string)($item->material_number ?? '');
-                if ($materialNumber === '') return [];
-                $key = ctype_digit($materialNumber) ? ltrim($materialNumber, '0') : $materialNumber;
-                return [$key => (int)$item->total_qty_scan];
+                $itemNumber = (string)($item->item_number ?? ''); // POSNR
+                if ($materialNumber === '' || $itemNumber === '') return [];
+
+                $matKey = ctype_digit($materialNumber) ? ltrim($materialNumber, '0') : $materialNumber;
+                $itemKey = ctype_digit($itemNumber) ? ltrim($itemNumber, '0') : $itemNumber;
+                return [$matKey . '-' . $itemKey => (int)$item->total_qty_scan];
             });
 
-
             $totalOrder = 0;
-            $totalScanFromItems = 0; // Hitung total scan dari item yang diproses
 
-            // 4. Gabungkan data item
-            $results = $doListItemsGrouped->map(function ($item, $key) use ($scannedCountsMap, &$totalOrder, &$totalScanFromItems, $doNumber) {
+            // Gabungkan data dan berikan nomor urut berdasarkan index setelah diurutkan
+            $finalResults = $doListItems->map(function ($item, $key) use ($scannedCountsMap, &$totalOrder, $doNumber) { // $key adalah index setelah orderBy
                 $matnr = (string)($item->MATNR ?? '');
-                if ($matnr === '') {
-                    Log::warning('MATNR kosong ditemukan di do_list saat grouping.', ['do_number' => $doNumber]);
-                    return null;
+                $posnr = (string)($item->POSNR ?? ''); // Gunakan POSNR asli (string)
+
+                if ($matnr === '' || $posnr === '') {
+                    Log::warning('MATNR atau POSNR kosong ditemukan.', ['do_number' => $doNumber, 'index' => $key]);
+                    return null; // Tandai untuk difilter
                 }
+
                 $materialKeyFormatted = ctype_digit($matnr) ? ltrim($matnr, '0') : $matnr;
-                $qtyScan = $scannedCountsMap->get($materialKeyFormatted, 0);
+                $itemKeyFormatted = ctype_digit($posnr) ? ltrim($posnr, '0') : $posnr;
+                $lookupKey = $materialKeyFormatted . '-' . $itemKeyFormatted;
+
+                $qtyScan = $scannedCountsMap->get($lookupKey, 0);
 
                 $itemData = [
-                    'no' => $key + 1,
+                    'no' => $key + 1, // Nomor urut berdasarkan index collection ($key)
                     'material_number' => $materialKeyFormatted,
                     'description' => $item->description ?? 'N/A',
-                    'qty_order' => (int)$item->total_qty_order,
+                    'qty_order' => (int)$item->qty_order,
                     'qty_scan' => $qtyScan,
                 ];
 
                 $totalOrder += $itemData['qty_order'];
-                $totalScanFromItems += $itemData['qty_scan'];
 
                 return $itemData;
-            })->filter();
+            })->filter() // Hapus item null jika ada
+              ->values(); // Reindex collection setelah filter (tidak diperlukan jika map langsung dari collection terurut)
 
-            // Hitung ulang Total Scan untuk Summary berdasarkan SUM langsung dari scanned_items
+
             $grandTotalScan = DB::table('scanned_items')
                                 ->where('do_number', $doNumber)
                                 ->sum('qty_scanned');
 
-            if ($results->isEmpty() && !$doListItemsGrouped->isEmpty()) {
+            if ($finalResults->isEmpty() && !$doListItems->isEmpty()) {
                  Log::warning('Hasil penggabungan detail riwayat kosong.', ['do_number' => $doNumber]);
             }
 
-            // Kirim $grandTotalScan untuk ringkasan
             return response()->json([
-                'header' => $doHeader, // --- Kirim data header ---
-                'items' => $results->values(),
+                'header' => $doHeader,
+                'items' => $finalResults, // Kirim hasil yang sudah diurutkan per POSNR dan diberi nomor urut
                 'summary' => [
                     'total_order' => $totalOrder,
                     'total_scan' => (int)$grandTotalScan
@@ -199,14 +200,18 @@ class DeliveryOrderController extends Controller
         }
 
         try {
-            $sapUsername = 'auto_email';
-            $sapPassword = '11223344';
+            $sapUsername = 'auto_email'; // Langsung gunakan value jika tidak dari .env
+            $sapPassword = '11223344'; // Langsung gunakan value jika tidak dari .env
             Log::info('Mengirim permintaan ke API Python', [
-                'username' => $sapUsername,
+                'username' => $sapUsername, // Gunakan variabel lokal
                 'P_VBELN' => $doNumber
             ]);
 
-            $response = Http::timeout(60)->post('http://127.0.0.1:8009/api/sap/get_do_details', [
+
+            $pythonApiUrl = 'http://127.0.0.1:5002/api/sap/get_do_details';
+            Log::info('Menghubungi API Python di: ' . $pythonApiUrl);
+
+            $response = Http::timeout(30)->post($pythonApiUrl, [ // Gunakan URL dari variabel
                 'username' => $sapUsername,
                 'password' => $sapPassword,
                 'P_VBELN' => $doNumber,
@@ -256,9 +261,10 @@ class DeliveryOrderController extends Controller
              // Mengambil Item DO per baris POSNR
              $doItems = DB::table('do_list')
                  ->where('VBELN', $doNumber)
-                 ->select('MATNR', 'MAKTX', 'VBELN as do_no', 'POSNR as item_no', 'CHARG2 as batch_no', 'LFIMG as qty_order')
-                 ->orderBy('POSNR', 'asc')
+                 ->select('MATNR', 'MAKTX', 'VBELN as do_no', 'POSNR', DB::raw('CAST(POSNR AS UNSIGNED) as posnr_int'), 'CHARG2 as batch_no', 'LFIMG as qty_order')
+                 ->orderBy('posnr_int', 'asc') // Urutkan berdasarkan POSNR numerik
                  ->get();
+
 
               if ($doItems->isEmpty()) {
                    Log::warning("Data Item DO kosong di DB Lokal setelah save.", ['do_number' => $doNumber]);
@@ -269,7 +275,7 @@ class DeliveryOrderController extends Controller
                  ->select('DELV', 'ITEM', 'EXIDV as hu_no', 'ITEM2 as item_hu', 'CHARG2 as charg2', 'VEMNG as qty_hu')
                  ->get();
 
-             $huMapByPosnr = $allHuDetails->groupBy('ITEM');
+             $huMapByPosnr = $allHuDetails->groupBy('ITEM'); // Kunci adalah POSNR asli (string)
 
              $multiItemHuMap = collect($allHuDetails)
                 ->groupBy('hu_no')
@@ -277,25 +283,26 @@ class DeliveryOrderController extends Controller
                     return $details->pluck('ITEM')->unique()->count() > 1;
                 })
                 ->map(function ($details) {
-                     // Simpan POSNR (ITEM) yang sudah diformat (ltrim)
                     return $details->pluck('ITEM')->map(function($posnr){
                          return ctype_digit((string)$posnr) ? ltrim($posnr, '0') : $posnr;
                     })->unique()->values()->all();
                 });
 
 
+             // Mapping langsung dari $doItems (tidak perlu grouping lagi)
              $formattedItems = $doItems->map(function ($item) use ($huMapByPosnr) {
-                 $posnrKey = $item->item_no;
+                 $posnrKey = $item->POSNR; // Gunakan POSNR asli (string) untuk lookup HU
                  if ($posnrKey === null) return null;
 
                  $material = ctype_digit((string)$item->MATNR) ? ltrim($item->MATNR, '0') : $item->MATNR;
-                 $itemNo = ctype_digit((string)$posnrKey) ? ltrim($posnrKey, '0') : $posnrKey;
+                 // Format POSNR untuk TAMPILAN
+                 $itemNoDisplay = ctype_digit((string)$posnrKey) ? ltrim($posnrKey, '0') : $posnrKey;
 
 
                  $huDetailsForItem = $huMapByPosnr->get($posnrKey, collect())->map(function($detail) {
                      return [
                          'delivery' => $detail->DELV ?? null,
-                         'item' => ctype_digit((string)$detail->ITEM) ? ltrim($detail->ITEM, '0') : $detail->ITEM,
+                         'item' => ctype_digit((string)$detail->ITEM) ? ltrim($detail->ITEM, '0') : $detail->ITEM, // POSNR terkait HU
                          'hu_no' => ctype_digit((string)$detail->hu_no) ? ltrim($detail->hu_no, '0') : $detail->hu_no,
                          'item_hu' => ctype_digit((string)$detail->item_hu) ? ltrim($detail->item_hu, '0') : $detail->item_hu,
                          'charg2' => $detail->charg2,
@@ -307,13 +314,14 @@ class DeliveryOrderController extends Controller
                      'material' => $material,
                      'description' => $item->MAKTX ?? 'N/A',
                      'do_no' => $item->do_no,
-                     'item_no' => $itemNo, // Ini adalah POSNR (sudah di-ltrim)
+                     'item_no' => $itemNoDisplay, // POSNR yang sudah diformat untuk tampilan
                      'batch_no' => $item->batch_no,
-                     'qty_order' => (int)$item->qty_order,
+                     'qty_order' => (int)$item->qty_order, // Qty untuk baris POSNR ini
                      'is_hu' => $huDetailsForItem->isNotEmpty(),
                      'hu_details' => $huDetailsForItem->values()->all(),
                  ];
              })->filter()->values();
+
 
              $progressData = DB::table('scanned_items')->where('do_number', $doNumber)->get();
 
@@ -329,9 +337,10 @@ class DeliveryOrderController extends Controller
                                       })
                                       ->all();
 
+             // Kunci group = MATNR(formatted)-POSNR(formatted)
              $scannedCounts = $progressData->groupBy(function($item) {
                  $material = isset($item->material_number) && ctype_digit((string)$item->material_number) ? ltrim($item->material_number, '0') : $item->material_number;
-                 $itemNo = isset($item->item_number) && ctype_digit((string)$item->item_number) ? ltrim($item->item_number, '0') : $item->item_number;
+                 $itemNo = isset($item->item_number) && ctype_digit((string)$item->item_number) ? ltrim($item->item_number, '0') : $item->item_number; // POSNR dari scan
                  if ($material === null || $itemNo === null) return null;
                  return $material . '-' . $itemNo;
              })
@@ -355,7 +364,7 @@ class DeliveryOrderController extends Controller
                  'ship_to' => $doHeader->ship_to,
                  'ship_type' => $doHeader->ship_type,
                  'container_no' => $containerInfo->V_NO_CONT ?? null,
-                 'items' => $formattedItems,
+                 'items' => $formattedItems, // Data item sekarang per baris POSNR
                  'progress' => $progress,
                  'multiItemHuMap' => $multiItemHuMap->mapWithKeys(function ($itemNos, $huNo) {
                       $formattedHu = ctype_digit((string)$huNo) ? ltrim($huNo, '0') : $huNo;
