@@ -4,7 +4,8 @@
 
 @push('styles')
 <style>
-    body {
+    /* ... (style Anda sebelumnya tidak berubah) ... */
+     body {
         background-color: #f8f9fa;
         font-family: 'Inter', sans-serif;
     }
@@ -182,8 +183,13 @@
         color: #17624a;
         font-weight: 600;
     }
+    /* --- Perbaikan: Padding Modal Body --- */
     .modal-body {
-        padding: 0;
+        padding: 0; /* Hapus padding default */
+    }
+    .table-responsive {
+        max-height: 60vh; /* Sesuaikan tinggi maksimal tabel */
+        overflow-y: auto;
     }
     .table {
         margin-bottom: 0;
@@ -194,7 +200,74 @@
         font-weight: 600;
         color: #495057;
         padding: 1rem 0.75rem;
+        /* Sticky Header */
+        position: sticky;
+        top: 0; /* Posisi relatif terhadap .table-responsive */
+        z-index: 10;
     }
+     /* --- Style untuk Print Section --- */
+     #print-header-info {
+         display: none; /* Sembunyikan di layar */
+     }
+    .print-summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Dua kolom sama lebar */
+        gap: 20px;
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 8px;
+    }
+    .print-summary-grid div {
+        /* Optional styling for boxes */
+    }
+     .print-summary-grid h6 { margin-bottom: 5px; color: #555; font-size: 10px; text-transform: uppercase;}
+     .print-summary-grid p, .print-summary-grid h4 { margin: 0; font-size: 12px; }
+     .print-summary-grid h4 { font-weight: bold; }
+
+    @media print {
+        body { margin: 20px; font-size: 10pt; }
+        .modal-header, .modal-footer, #modal-loader, .btn { display: none; }
+        .modal-content { box-shadow: none; border-radius: 0; }
+        .modal-body { padding: 0 !important; }
+        .table-responsive { max-height: none; overflow: visible; }
+        .table thead th { position: static; background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 15px;}
+        .table th, .table td { border: 1px solid #ccc; padding: 6px;}
+        .summary-box { display: none; /* Sembunyikan summary box asli */ }
+        #print-header-info { display: block !important; /* Tampilkan info header saat print */ }
+        /* --- PERBAIKAN: Style Print Header --- */
+        .print-summary-grid {
+             grid-template-columns: 1fr 1fr;
+             gap: 10px; /* Kurangi jarak antar item */
+             margin-bottom: 15px; /* Kurangi margin bawah */
+             padding: 10px;
+             border: 1px solid #ccc;
+             background-color: #f8f9fa !important;
+            -webkit-print-color-adjust: exact;
+         }
+         .print-summary-grid div {
+             padding-bottom: 3px; /* Kurangi padding bawah */
+             border-bottom: 1px dotted #ddd;
+         }
+          .print-summary-grid h6 {
+              margin-bottom: 2px; /* Kurangi margin bawah heading */
+              color: #555;
+              font-size: 10px; /* Sedikit lebih besar */
+              text-transform: uppercase;
+              font-weight: normal;
+          }
+          .print-summary-grid p, .print-summary-grid h4 {
+              margin: 0;
+              font-size: 12px; /* Sedikit lebih besar */
+          }
+          .print-summary-grid h4 { font-weight: bold; }
+         /* --- Akhir Perbaikan --- */
+
+         tr { page-break-inside: avoid; }
+    }
+    /* --- Akhir Style untuk Print Section --- */
+
     .table tbody td {
         padding: 0.875rem 0.75rem;
         vertical-align: middle;
@@ -330,6 +403,7 @@
                 <!-- Panel Selesai -->
                 <div class="tab-pane fade show active" id="completed-panel" role="tabpanel" aria-labelledby="completed-tab">
                     <div class="row history-list" id="completed-list">
+                        {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
                         @forelse ($completedDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->VERIFIED_AT)->timestamp }}">
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
@@ -360,10 +434,10 @@
                         @endforelse
                     </div>
                 </div>
-
                 <!-- Panel Dalam Proses -->
                 <div class="tab-pane fade" id="inprogress-panel" role="tabpanel" aria-labelledby="inprogress-tab">
                     <div class="row history-list" id="inprogress-list">
+                         {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
                         @forelse ($inProgressDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->updated_at)->timestamp }}">
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
@@ -410,31 +484,34 @@
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0">
-        <div id="modal-loader" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 text-muted">Memuat data verifikasi...</p>
-        </div>
-        <div id="modal-content-area" class="d-none">
-            <div id="modal-summary-area" class="p-4 border-bottom"></div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="sticky-top bg-light">
-                        <tr>
-                            <th style="width: 5%;" class="ps-4">No.</th>
-                            <th style="width: 45%;">Material</th>
-                            <th style="width: 25%;" class="text-center">Qty Order</th>
-                            <th style="width: 25%;" class="text-center">Qty Scan</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modal-scanned-items-body">
-                    </tbody>
-                </table>
-            </div>
-        </div>
-      </div>
+       <div class="modal-body p-0">
+         <div id="modal-loader" class="text-center py-5">
+             <div class="spinner-border text-primary" role="status">
+                 <span class="visually-hidden">Loading...</span>
+             </div>
+             <p class="mt-2 text-muted">Memuat data verifikasi...</p>
+         </div>
+         <div id="modal-content-area" class="d-none">
+             {{-- Container untuk Info Header Cetak --}}
+             <div id="print-header-info" class="p-4 border-bottom"></div>
+             {{-- Container untuk Summary Box (Tetap Tampil di Layar) --}}
+             <div id="modal-summary-area" class="p-4 border-bottom"></div>
+             <div class="table-responsive">
+                 <table class="table table-hover mb-0">
+                     <thead class="sticky-top bg-light">
+                         <tr>
+                             <th style="width: 5%;" class="ps-4">No.</th>
+                             <th style="width: 45%;">Material</th>
+                             <th style="width: 25%;" class="text-center">Qty Order</th>
+                             <th style="width: 25%;" class="text-center">Qty Scan</th>
+                         </tr>
+                     </thead>
+                     <tbody id="modal-scanned-items-body">
+                     </tbody>
+                 </table>
+             </div>
+         </div>
+       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
             <i class="fas fa-times me-2"></i>Tutup
@@ -460,13 +537,13 @@
         const modalDoNumber = document.getElementById('modal-do-number');
         const modalTableBody = document.getElementById('modal-scanned-items-body');
         const modalSummaryArea = document.getElementById('modal-summary-area');
+        const printHeaderInfo = document.getElementById('print-header-info');
         const totalCountElement = document.getElementById('total-count');
         const printButton = document.getElementById('print-details');
+        let currentHeaderData = null; // Simpan data header saat ini
 
-        // Inisialisasi jumlah total
         updateTotalCount();
 
-        // Fungsi untuk memperbarui jumlah total item yang ditampilkan
         function updateTotalCount() {
             const activeTabPane = document.querySelector('.tab-pane.active');
             if (activeTabPane) {
@@ -475,15 +552,13 @@
             }
         }
 
-        // Fungsi filter
         filterInput.addEventListener('keyup', function() {
             const filterText = this.value.toLowerCase();
             const activeTabPane = document.querySelector('.tab-pane.active');
-
             if (activeTabPane) {
                 const historyItems = activeTabPane.querySelectorAll('.history-item');
                 let visibleCount = 0;
-
+                let originalEmptyState = activeTabPane.querySelector('.original-empty-state');
                 historyItems.forEach(item => {
                     const itemText = item.getAttribute('data-filter-text');
                     if (itemText.includes(filterText)) {
@@ -493,205 +568,193 @@
                         item.style.display = 'none';
                     }
                 });
-
-                // Tampilkan pesan jika tidak ada hasil
                 const listContainer = activeTabPane.querySelector('.history-list');
-                const emptyMessage = listContainer.querySelector('.empty-state');
-
-                if (visibleCount === 0 && !emptyMessage) {
-                    const emptyHtml = `
-                        <div class="col-12">
-                            <div class="empty-state">
-                                <i class="fas fa-search"></i>
-                                <h4 class="text-muted">Tidak ada hasil ditemukan</h4>
-                                <p class="mb-0">Coba ubah kata kunci pencarian atau filter</p>
-                            </div>
-                        </div>
-                    `;
-                    listContainer.innerHTML = emptyHtml;
-                } else if (visibleCount > 0 && emptyMessage) {
-                    // Jika ada hasil dan sebelumnya ada pesan kosong, hapus pesan kosong
-                    emptyMessage.remove();
+                let noResultMessage = listContainer.querySelector('.no-result-message');
+                if (visibleCount === 0 && historyItems.length > 0) {
+                    if (!noResultMessage) {
+                        const emptyHtml = `<div class="col-12 no-result-message"><div class="empty-state"><i class="fas fa-search"></i><h4 class="text-muted">Tidak ada hasil ditemukan</h4><p class="mb-0">Coba ubah kata kunci pencarian</p></div></div>`;
+                        listContainer.insertAdjacentHTML('beforeend', emptyHtml);
+                    }
+                    if (originalEmptyState) originalEmptyState.style.display = 'none';
+                } else {
+                    if (noResultMessage) noResultMessage.remove();
+                    if (historyItems.length === 0 && originalEmptyState) originalEmptyState.style.display = '';
                 }
-
                 totalCountElement.textContent = visibleCount;
             }
         });
 
-        // Fungsi sorting
         sortSelect.addEventListener('change', function() {
             const sortValue = this.value;
             const activeTabPane = document.querySelector('.tab-pane.active');
-
             if (activeTabPane) {
                 const historyList = activeTabPane.querySelector('.history-list');
-                const historyItems = Array.from(activeTabPane.querySelectorAll('.history-item:not([style*="display: none"])'));
-
+                const historyItems = Array.from(activeTabPane.querySelectorAll('.history-item'));
                 historyItems.sort((a, b) => {
                     const aText = a.querySelector('.do-number').textContent;
                     const bText = b.querySelector('.do-number').textContent;
                     const aDate = parseInt(a.getAttribute('data-date'));
                     const bDate = parseInt(b.getAttribute('data-date'));
-
                     switch(sortValue) {
-                        case 'newest':
-                            return bDate - aDate;
-                        case 'oldest':
-                            return aDate - bDate;
-                        case 'do-asc':
-                            return aText.localeCompare(bText);
-                        case 'do-desc':
-                            return bText.localeCompare(aText);
-                        default:
-                            return 0;
+                        case 'newest': return bDate - aDate;
+                        case 'oldest': return aDate - bDate;
+                        case 'do-asc': return aText.localeCompare(bText);
+                        case 'do-desc': return bText.localeCompare(aText);
+                        default: return 0;
                     }
                 });
-
-                // Hapus semua item dan tambahkan kembali sesuai urutan
-                historyItems.forEach(item => {
-                    historyList.appendChild(item);
-                });
+                historyItems.forEach(item => { historyList.appendChild(item); });
+                filterInput.dispatchEvent(new Event('keyup'));
             }
         });
 
-        // Event listener untuk modal detail
         historyDetailModal.addEventListener('show.bs.modal', async function (event) {
             const card = event.relatedTarget;
             const doNumber = card.getAttribute('data-do-number');
-
             modalDoNumber.textContent = doNumber;
             modalTableBody.innerHTML = '';
             modalSummaryArea.innerHTML = '';
+            printHeaderInfo.innerHTML = '';
+            currentHeaderData = null;
             modalLoader.classList.remove('d-none');
             modalContent.classList.add('d-none');
 
             try {
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
                 const response = await fetch(url);
-
-                if (!response.ok) throw new Error('Gagal mengambil data dari server');
+                if (!response.ok) {
+                    const errorJson = await response.json().catch(() => ({}));
+                    throw new Error(errorJson.error || 'Gagal mengambil data dari server');
+                }
                 const data = await response.json();
+                currentHeaderData = data.header || {};
 
-                // Tampilkan summary
                 if (data.summary) {
                     const totalOrder = data.summary.total_order;
                     const totalScan = data.summary.total_scan;
-                    const isComplete = totalOrder === totalScan;
-                    const summaryClass = isComplete ? 'summary-success' :
-                                        (totalScan > 0 ? 'summary-warning' : 'summary-danger');
+                    const isComplete = currentHeaderData.VERIFIED_AT != null;
+                    const summaryClass = isComplete ? 'summary-success' : (totalScan > 0 ? 'summary-warning' : 'summary-danger');
+                    const statusText = isComplete ? 'SELESAI' : (totalScan > 0 ? 'PROSES' : 'BELUM DIMULAI');
 
-                    const summaryHtml = `
-                        <div class="row text-center summary-box ${summaryClass}">
-                            <div class="col-4">
-                                <h6>TOTAL QTY ORDER</h6>
-                                <h3 class="fw-bold mb-0">${totalOrder.toLocaleString()}</h3>
-                            </div>
-                            <div class="col-4">
-                                <h6>TOTAL QTY SCAN</h6>
-                                <h3 class="fw-bold mb-0">${totalScan.toLocaleString()}</h3>
-                            </div>
-                            <div class="col-4">
-                                <h6>STATUS</h6>
-                                <h4 class="fw-bold mb-0">${isComplete ? 'SELESAI' : 'BELUM SELESAI'}</h4>
-                            </div>
-                        </div>
-                    `;
+                    const summaryHtml = `<div class="row text-center summary-box ${summaryClass}"><div class="col-4"><h6>TOTAL QTY ORDER</h6><h3 class="fw-bold mb-0">${totalOrder.toLocaleString()}</h3></div><div class="col-4"><h6>TOTAL QTY SCAN</h6><h3 class="fw-bold mb-0">${totalScan.toLocaleString()}</h3></div><div class="col-4"><h6>STATUS</h6><h4 class="fw-bold mb-0">${statusText}</h4></div></div>`;
                     modalSummaryArea.innerHTML = summaryHtml;
+
+                    const printHeaderHtml = `<div class="print-summary-grid"><div><h6>Pelanggan</h6><p>${currentHeaderData.customer || 'N/A'}</p></div><div><h6>Alamat</h6><p>${currentHeaderData.address || 'N/A'}</p></div><div><h6>No. Kontainer</h6><p>${currentHeaderData.container_no || 'N/A'}</p></div><div><h6>Status Verifikasi</h6><p>${statusText}</p></div><div><h6>Total Qty Order</h6><h4>${totalOrder.toLocaleString()}</h4></div><div><h6>Total Qty Scan</h6><h4>${totalScan.toLocaleString()}</h4></div></div>`;
+                    printHeaderInfo.innerHTML = printHeaderHtml;
                 }
 
-                // Tampilkan items
                 const items = data.items;
                 if (items.length > 0) {
                     items.forEach(item => {
-                        const materialDisplay = /^[0-9]+$/.test(item.material_number)
-                            ? item.material_number.replace(/^0+/, '')
-                            : item.material_number;
-
+                        const materialDisplay = /^[0-9]+$/.test(item.material_number) ? item.material_number.replace(/^0+/, '') : item.material_number;
                         const qtyOrder = parseInt(item.qty_order);
                         const qtyScan = parseInt(item.qty_scan);
                         const qtyClass = qtyOrder === qtyScan ? 'qty-match' : 'qty-mismatch';
-
-                        const row = `
-                            <tr>
-                                <td class="ps-4">${item.no}</td>
-                                <td>
-                                    <div class="material-number">${materialDisplay}</div>
-                                    <div class="material-description">${item.description}</div>
-                                </td>
-                                <td class="text-center">${qtyOrder.toLocaleString()}</td>
-                                <td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td>
-                            </tr>
-                        `;
+                        const row = `<tr><td class="ps-4">${item.no}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
                         modalTableBody.innerHTML += row;
                     });
                 } else {
-                    modalTableBody.innerHTML = `
-                        <tr>
-                            <td colspan="4" class="text-center py-4">
-                                <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
-                                <p class="text-muted mb-0">Tidak ada data scan ditemukan.</p>
-                            </td>
-                        </tr>
-                    `;
+                    modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-box-open fa-2x text-muted mb-2"></i><p class="text-muted mb-0">Tidak ada data scan ditemukan.</p></td></tr>`;
                 }
 
             } catch (error) {
                 console.error('Error fetching history details:', error);
-                modalTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="text-center py-4">
-                            <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
-                            <p class="text-danger mb-0">Gagal memuat data. Silakan coba lagi.</p>
-                        </td>
-                    </tr>
-                `;
+                modalSummaryArea.innerHTML = '';
+                printHeaderInfo.innerHTML = '';
+                modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i><p class="text-danger mb-0">Gagal memuat data: ${error.message}</p></td></tr>`;
             } finally {
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
             }
         });
 
-        // Fungsi untuk mencetak detail
         printButton.addEventListener('click', function() {
             const doNumber = modalDoNumber.textContent;
-            const printContent = document.querySelector('#modal-content-area').innerHTML;
+            const tableContent = document.querySelector('#modal-content-area .table-responsive').innerHTML;
+            const headerPrintContent = printHeaderInfo.innerHTML;
 
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
                 <html>
                     <head>
                         <title>Detail Verifikasi DO: ${doNumber}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            .summary-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-                            table { width: 100%; border-collapse: collapse; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .qty-match { color: green; }
-                            .qty-mismatch { color: red; }
-                            @media print {
-                                body { margin: 0; }
-                                .summary-box { background: #f8f9fa !important; -webkit-print-color-adjust: exact; }
-                                th { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
-                            }
-                        </style>
+                         <style>
+                             body { font-family: Arial, sans-serif; margin: 1px; font-size: 12pt; } /* Sedikit perbesar font dasar */
+                             h2 {
+                                 text-align: center;
+                                 margin-top: 0; /* Hapus margin atas */
+                                 margin-bottom: 5px; /* Kurangi margin bawah */
+                                 font-size: 14pt;
+                             }
+                            .print-summary-grid {
+                                 display: grid;
+                                 grid-template-columns: 1fr 1fr;
+                                 gap: 2px 3px; /* Kurangi gap vertikal, biarkan horizontal */
+                                 margin-bottom: 0.2px; /* Kurangi margin bawah */
+                                 padding: 1px; /* Kurangi padding */
+                                 border: 1px solid #ccc;
+                                 border-radius: 3px; /* Sedikit kurangi radius */
+                                 background-color: #f8f9fa !important;
+                                -webkit-print-color-adjust: exact;
+                             }
+                             .print-summary-grid div {
+                                 padding-bottom: 0.2px; /* Sangat kurangi padding bawah */
+                                 border-bottom: 1px dotted #ddd;
+                                 margin-bottom: 1px; /* Tambah sedikit margin antar baris info */
+                             }
+                              /* Perbesar sedikit font header cetak */
+                              .print-summary-grid h6 {
+                                  margin-bottom: 0.5px; /* Rapatkan heading dan isi */
+                                  color: #555;
+                                  font-size: 14px; /* Sedikit lebih besar */
+                                  text-transform: uppercase;
+                                  font-weight: normal;
+                              }
+                              .print-summary-grid p, .print-summary-grid h4 {
+                                  margin: 0;
+                                  font-size: 12px; /* Sedikit lebih besar */
+                                  line-height: 1.8; /* Sedikit renggangkan baris jika teks panjang */
+                              }
+                              .print-summary-grid h4 { font-weight: bold; }
+
+                             table { width: 100%; border-collapse: collapse; margin-top: 10px;} /* Kurangi margin atas tabel */
+                             th, td { border: 1px solid #ccc; padding: 6px; text-align: left; vertical-align: top;} /* Kurangi padding sel */
+                             th { background-color: #f2f2f2 !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+                             .text-center { text-align: center; }
+                             .ps-4 { padding-left: 1rem !important; } /* Kurangi padding kiri kolom No */
+                             .material-number { font-weight: bold; font-size: 11pt; } /* Sesuaikan font size */
+                             .material-description { font-size: 8pt; color: #333; } /* Sesuaikan font size */
+                             .qty-match { color: green !important; -webkit-print-color-adjust: exact;}
+                             .qty-mismatch { color: red !important; -webkit-print-color-adjust: exact;}
+                             tr { page-break-inside: avoid; }
+                         </style>
                     </head>
                     <body>
                         <h2>Detail Verifikasi DO: ${doNumber}</h2>
-                        <div>${printContent}</div>
+                        ${headerPrintContent}
+                        ${tableContent}
                     </body>
                 </html>
             `);
             printWindow.document.close();
-            printWindow.print();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
         });
 
-        // Update count ketika tab diubah
         document.querySelectorAll('#historyTab button').forEach(tab => {
             tab.addEventListener('shown.bs.tab', function() {
                 updateTotalCount();
+                 filterInput.dispatchEvent(new Event('keyup'));
             });
         });
+
+        if (document.querySelector('.tab-pane.active')) {
+             updateTotalCount();
+             filterInput.dispatchEvent(new Event('keyup'));
+        }
+
     });
 </script>
 @endpush
+

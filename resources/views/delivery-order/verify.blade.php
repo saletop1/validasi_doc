@@ -1,7 +1,5 @@
 @extends('layouts.app')
-
 @section('title', 'Verifikasi Delivery Order')
-
 @push('styles')
 <style>
     /* ... (style Anda sebelumnya tidak berubah) ... */
@@ -250,7 +248,7 @@
 <div class="container-fluid py-4">
     <div class="card main-card">
         <div class="card-header card-header-custom d-flex justify-content-between align-items-center flex-wrap">
-            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i> Verifikasi & Scan DO</h2>
+            <h2 class="mb-0 h3"><i class="fas fa-truck me-2"></i>Verifikasi Delivery Order</h2>
             @auth
             <div class="d-flex align-items-center mt-2 mt-md-0">
                 <span class="text-white me-3 d-none d-md-inline">Selamat datang, <strong>{{ Auth::user()->name }}</strong></span>
@@ -266,7 +264,7 @@
             <div class="row justify-content-center align-items-end mb-4">
                 <div class="col-lg-7 col-md-8">
                     <div class="form-group">
-                        <label for="do_number" class="form-label fs-5 fw-bold mb-2">Nomor Delivery Order</label>
+                        <label for="do_number" class="form-label fs-5 fw-bold mb-2"></label>
                         <div class="input-group">
                             <input type="text" class="form-control form-control-lg" id="do_number" placeholder="Masukkan nomor DO..." name="do_number">
                             <button class="btn btn-gradient px-4" type="button" id="btn-search-do"><i class="fas fa-search me-2"></i>Cari</button>
@@ -399,13 +397,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const doDetailsSection = document.getElementById('do-details');
     const loader = document.getElementById('loader');
     const filterInput = document.getElementById('item-filter-input');
-
     const btnCameraScan = document.getElementById('btn-camera-scan');
     const cameraScannerModalElement = document.getElementById('cameraScannerModal');
     const cameraScannerModal = new bootstrap.Modal(cameraScannerModalElement);
     let html5QrcodeScanner;
     let isScanCooldown = false;
-
     let currentDOData = null;
     let scannedHUs = new Set(); // Set untuk melacak HU yang sudah discan di DO ini
     let isCompletionNotified = false;
@@ -602,8 +598,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSummary();
         updateHUDetailView(); // Panggil updateHUDetailView setelah semua elemen dibuat
     }
-
-
 
     function updateProgressBarColor(progressKey, currentScan, qtyOrder) {
          // ... (fungsi updateProgressBarColor tidak berubah) ...
@@ -997,13 +991,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-
     function onScanSuccess(decodedText, decodedResult) {
         if (isScanCooldown) return;
         isScanCooldown = true;
         processScannedBarcode(decodedText);
         if (window.navigator.vibrate) { window.navigator.vibrate(100); }
-        cameraScannerModal.hide();
+        //cameraScannerModal.hide();
         setTimeout(() => { isScanCooldown = false; }, 1000);
     }
 

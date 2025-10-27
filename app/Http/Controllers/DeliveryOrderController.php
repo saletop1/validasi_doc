@@ -58,7 +58,7 @@ class DeliveryOrderController extends Controller
     }
 
     /**
-     * Mengambil detail item yang sudah discan untuk sebuah DO.
+     * Mengambil detail item yang sudah discan untuk sebuah DO, termasuk header.
      * Mengelompokkan berdasarkan MATNR.
      *
      * @param string $doNumber
@@ -67,6 +67,28 @@ class DeliveryOrderController extends Controller
     public function getScannedItemsForDO($doNumber)
     {
         try {
+            // --- PERBAIKAN: Ambil data header DO ---
+            $doHeader = DB::table('do_list')
+                ->where('VBELN', $doNumber)
+                ->select('NAME1 as customer', 'ADDRESS as address', 'SHIPTO as ship_to', 'VTEXT as shipping_point', 'BEZEI2 as ship_type', 'VERIFIED_AT') // Ambil kolom yang relevan
+                ->first(); // Ambil satu baris header saja
+
+             if (!$doHeader) {
+                 Log::warning('Header DO tidak ditemukan di do_list untuk DO: ' . $doNumber);
+                 // Kembalikan error atau data kosong jika header tidak ada
+                 return response()->json(['error' => 'Data header DO tidak ditemukan.'], 404);
+             }
+
+             // Ambil nomor kontainer (coba cari yang tidak null)
+             $containerInfo = DB::table('do_list_details')
+                 ->where('DELV', $doNumber)
+                 ->whereNotNull('V_NO_CONT')
+                 ->select('V_NO_CONT')
+                 ->first();
+             $doHeader->container_no = $containerInfo->V_NO_CONT ?? 'N/A'; // Tambahkan ke objek header
+            // --- Akhir Perbaikan ---
+
+
             // 1. Ambil item DO unik berdasarkan MATNR, sum LFIMG, ambil deskripsi pertama
             $doListItemsGrouped = DB::table('do_list')
                 ->where('VBELN', $doNumber)
@@ -75,27 +97,29 @@ class DeliveryOrderController extends Controller
                 ->orderBy('MATNR', 'asc')
                 ->get();
 
-             // Jika tidak ada item DO sama sekali, kembalikan data kosong
+             // Jika tidak ada item DO sama sekali
              if ($doListItemsGrouped->isEmpty()) {
                  Log::warning('Tidak ada item ditemukan di do_list untuk DO: ' . $doNumber);
-                 return response()->json(['items' => [], 'summary' => ['total_order' => 0, 'total_scan' => 0]]);
+                  // Tetap kirim header jika ada, tapi item kosong
+                 return response()->json([
+                     'header' => $doHeader,
+                     'items' => [],
+                     'summary' => ['total_order' => 0, 'total_scan' => 0]
+                 ]);
              }
 
             // 2. Ambil total scan per material_number
             $scannedData = DB::table('scanned_items')
                 ->where('do_number', $doNumber)
-                 // Pastikan material_number tidak null saat mengambil data scan
                 ->whereNotNull('material_number')
                 ->select('material_number', DB::raw('SUM(qty_scanned) as total_qty_scan'))
                 ->groupBy('material_number')
                 ->get();
 
-            // 3. Buat peta (Map) dari data scan untuk pencocokan cepat
+            // 3. Buat peta (Map) dari data scan
             $scannedCountsMap = collect($scannedData)->mapWithKeys(function ($item) {
-                // Konversi material_number ke string untuk konsistensi
                 $materialNumber = (string)($item->material_number ?? '');
-                if ($materialNumber === '') return []; // Lewati jika kosong
-                 // Kunci PETA menggunakan format konsisten (tanpa leading zero jika numerik)
+                if ($materialNumber === '') return [];
                 $key = ctype_digit($materialNumber) ? ltrim($materialNumber, '0') : $materialNumber;
                 return [$key => (int)$item->total_qty_scan];
             });
@@ -104,16 +128,15 @@ class DeliveryOrderController extends Controller
             $totalOrder = 0;
             $totalScanFromItems = 0; // Hitung total scan dari item yang diproses
 
-            // 4. Gabungkan data
+            // 4. Gabungkan data item
             $results = $doListItemsGrouped->map(function ($item, $key) use ($scannedCountsMap, &$totalOrder, &$totalScanFromItems, $doNumber) {
-                $matnr = (string)($item->MATNR ?? ''); // Konversi ke string
+                $matnr = (string)($item->MATNR ?? '');
                 if ($matnr === '') {
                     Log::warning('MATNR kosong ditemukan di do_list saat grouping.', ['do_number' => $doNumber]);
                     return null;
                 }
-                // Format MATNR dari do_list untuk LOOKUP di PETA
                 $materialKeyFormatted = ctype_digit($matnr) ? ltrim($matnr, '0') : $matnr;
-                $qtyScan = $scannedCountsMap->get($materialKeyFormatted, 0); // Ambil dari PETA
+                $qtyScan = $scannedCountsMap->get($materialKeyFormatted, 0);
 
                 $itemData = [
                     'no' => $key + 1,
@@ -124,27 +147,27 @@ class DeliveryOrderController extends Controller
                 ];
 
                 $totalOrder += $itemData['qty_order'];
-                $totalScanFromItems += $itemData['qty_scan']; // Akumulasi dari item yang dipetakan
+                $totalScanFromItems += $itemData['qty_scan'];
 
                 return $itemData;
-            })->filter(); // Hapus item yang null
+            })->filter();
 
-            // --- PERBAIKAN: Hitung ulang Total Scan untuk Summary berdasarkan SUM langsung dari scanned_items ---
+            // Hitung ulang Total Scan untuk Summary berdasarkan SUM langsung dari scanned_items
             $grandTotalScan = DB::table('scanned_items')
                                 ->where('do_number', $doNumber)
-                                ->sum('qty_scanned'); // Hitung total scan keseluruhan
-            // --- Akhir Perbaikan ---
+                                ->sum('qty_scanned');
 
             if ($results->isEmpty() && !$doListItemsGrouped->isEmpty()) {
                  Log::warning('Hasil penggabungan detail riwayat kosong.', ['do_number' => $doNumber]);
             }
 
-            // Gunakan $grandTotalScan untuk ringkasan
+            // Kirim $grandTotalScan untuk ringkasan
             return response()->json([
+                'header' => $doHeader, // --- Kirim data header ---
                 'items' => $results->values(),
                 'summary' => [
                     'total_order' => $totalOrder,
-                    'total_scan' => (int)$grandTotalScan // Pastikan integer
+                    'total_scan' => (int)$grandTotalScan
                 ]
             ]);
 
@@ -153,9 +176,8 @@ class DeliveryOrderController extends Controller
                 'do_number' => $doNumber,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString() // Aktifkan trace jika perlu
+                'trace' => $e->getTraceAsString()
             ]);
-            // Beri pesan error yang lebih informatif ke frontend jika memungkinkan
             return response()->json(['error' => 'Gagal memuat data detail: ' . $e->getMessage()], 500);
         }
     }
@@ -184,7 +206,7 @@ class DeliveryOrderController extends Controller
                 'P_VBELN' => $doNumber
             ]);
 
-            $response = Http::timeout(30)->post('http://127.0.0.1:8009/api/sap/get_do_details', [
+            $response = Http::timeout(60)->post('http://127.0.0.1:8009/api/sap/get_do_details', [
                 'username' => $sapUsername,
                 'password' => $sapPassword,
                 'P_VBELN' => $doNumber,
