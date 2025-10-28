@@ -29,7 +29,7 @@ class Kernel extends ConsoleKernel
 
         // (TAMBAHKAN BARIS INI)
         // Menjalankan perintah 'outstanding:fetch' setiap 5 jam
-        $schedule->command('outstanding:fetch')->everyFiveMinutes();
+        // $schedule->command('outstanding:fetch')->everyFiveMinutes();
     }
 
     /**
