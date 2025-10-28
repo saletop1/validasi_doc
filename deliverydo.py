@@ -48,11 +48,6 @@ def get_do_details():
         logging.info(f"Memanggil RFC Z_FM_YSDR002 untuk DO: {do_number}")
         result = conn.call('Z_FM_YSDR002', P_VBELN=do_number)
 
-        # --- PERBAIKAN: Log mentah dari SAP dihilangkan dari terminal ---
-        # logging.info(f"--- HASIL MENTAH DARI SAP UNTUK DO {do_number} ---")
-        # logging.info(result)
-        # logging.info("---------------------------------------------")
-
         t_data = result.get('T_DATA', [])
         t_data2 = result.get('T_DATA2', [])
 

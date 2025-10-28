@@ -344,7 +344,6 @@
             <p class="mb-0 mt-2 opacity-75">Pantau dan kelola semua riwayat verifikasi DO dalam satu tempat</p>
         </div>
         <div class="card-body p-4 p-md-5">
-            <!-- Header dengan Filter dan Navigasi -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <a href="{{ route('do.verify.index') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-2"></i>Kembali ke Verifikasi
@@ -354,13 +353,10 @@
                     <select class="form-select form-select-sm sort-options" id="history-sort">
                         <option value="newest">Terbaru</option>
                         <option value="oldest">Terlama</option>
-                        <option value="do-asc">No. DO (A-Z)</option>
-                        <option value="do-desc">No. DO (Z-A)</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Section Filter -->
             <div class="filter-section">
                 <div class="row align-items-center">
                     <div class="col-md-8">
@@ -380,7 +376,6 @@
                 </div>
             </div>
 
-            <!-- Navigasi Tab -->
             <ul class="nav nav-tabs" id="historyTab" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
@@ -398,12 +393,9 @@
                 </li>
             </ul>
 
-            <!-- Konten Tab -->
             <div class="tab-content" id="historyTabContent">
-                <!-- Panel Selesai -->
                 <div class="tab-pane fade show active" id="completed-panel" role="tabpanel" aria-labelledby="completed-tab">
                     <div class="row history-list" id="completed-list">
-                        {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
                         @forelse ($completedDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->VERIFIED_AT)->timestamp }}">
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
@@ -434,11 +426,9 @@
                         @endforelse
                     </div>
                 </div>
-                <!-- Panel Dalam Proses -->
                 <div class="tab-pane fade" id="inprogress-panel" role="tabpanel" aria-labelledby="inprogress-tab">
                     <div class="row history-list" id="inprogress-list">
-                         {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
-                        @forelse ($inProgressDos as $items)
+                         @forelse ($inProgressDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->updated_at)->timestamp }}">
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
                                     <div class="card-body">
@@ -473,7 +463,6 @@
     </div>
 </div>
 
-<!-- Modal Detail -->
 <div class="modal fade" id="historyDetailModal" tabindex="-1" aria-labelledby="historyDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -492,9 +481,7 @@
              <p class="mt-2 text-muted">Memuat data verifikasi...</p>
          </div>
          <div id="modal-content-area" class="d-none">
-             {{-- Container untuk Info Header Cetak --}}
              <div id="print-header-info" class="p-4 border-bottom"></div>
-             {{-- Container untuk Summary Box (Tetap Tampil di Layar) --}}
              <div id="modal-summary-area" class="p-4 border-bottom"></div>
              <div class="table-responsive">
                  <table class="table table-hover mb-0">
@@ -540,7 +527,7 @@
         const printHeaderInfo = document.getElementById('print-header-info');
         const totalCountElement = document.getElementById('total-count');
         const printButton = document.getElementById('print-details');
-        let currentHeaderData = null; // Simpan data header saat ini
+        let currentHeaderData = null;
 
         updateTotalCount();
 
@@ -620,7 +607,6 @@
             modalContent.classList.add('d-none');
 
             try {
-                // Tambahkan parameter unik untuk mencegah cache
                 const cacheBuster = new Date().getTime();
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}?t=${cacheBuster}`;
 
@@ -648,9 +634,6 @@
 
                 const items = data.items;
                 if (items.length > 0) {
-                    // ==========================================================
-                    // --- PERBAIKAN: Menggunakan item.no dari Controller ---
-                    // ==========================================================
                     items.forEach(item => { // 1. Hapus ', index'
                         const materialDisplay = /^[0-9]+$/.test(item.material_number) ? item.material_number.replace(/^0+/, '') : item.material_number;
                         const qtyOrder = parseInt(item.qty_order);
@@ -661,10 +644,7 @@
                         const row = `<tr><td class="ps-4">${item.no}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
                         modalTableBody.innerHTML += row;
                     });
-                    // ==========================================================
-                    // --- AKHIR PERBAIKAN ---
-                    // ==========================================================
-                } else {
+                    } else {
                     modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-box-open fa-2x text-muted mb-2"></i><p class="text-muted mb-0">Tidak ada data scan ditemukan.</p></td></tr>`;
                 }
 
