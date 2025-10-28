@@ -37,7 +37,7 @@
         border-radius: 0.875rem;
         margin-bottom: 1.25rem;
         transition: all 0.3s ease;
-        cursor: pointer;
+        cursor: pointer; /* Kembalikan cursor pointer */
         position: relative;
         overflow: hidden;
     }
@@ -113,6 +113,11 @@
     .summary-warning {
         background: linear-gradient(135deg, #f57c00, #ff9800);
     }
+     /* Tambahkan style untuk summary abu-abu (Menunggu tanpa scan) */
+    .summary-secondary {
+        background: linear-gradient(135deg, #6c757d, #adb5bd);
+    }
+
     .badge-status {
         font-size: 0.75rem;
         padding: 0.35rem 0.75rem;
@@ -151,7 +156,7 @@
         border-bottom: 3px solid #1ddec8;
     }
     .tab-content {
-        min-height: 400px;
+        min-height: 400px; /* Jaga tinggi minimum untuk semua tab */
     }
     .history-count {
         background: #e9ecef;
@@ -183,12 +188,11 @@
         color: #17624a;
         font-weight: 600;
     }
-    /* --- Perbaikan: Padding Modal Body --- */
     .modal-body {
-        padding: 0; /* Hapus padding default */
+        padding: 0;
     }
     .table-responsive {
-        max-height: 60vh; /* Sesuaikan tinggi maksimal tabel */
+        max-height: 60vh;
         overflow-y: auto;
     }
     .table {
@@ -200,73 +204,64 @@
         font-weight: 600;
         color: #495057;
         padding: 1rem 0.75rem;
-        /* Sticky Header */
         position: sticky;
-        top: 0; /* Posisi relatif terhadap .table-responsive */
+        top: 0;
         z-index: 10;
     }
-     /* --- Style untuk Print Section --- */
      #print-header-info {
-         display: none; /* Sembunyikan di layar */
+         display: none;
      }
     .print-summary-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr; /* Dua kolom sama lebar */
+        grid-template-columns: 1fr 1fr;
         gap: 20px;
         margin-bottom: 20px;
         padding: 15px;
         border: 1px solid #eee;
         border-radius: 8px;
     }
-    .print-summary-grid div {
-        /* Optional styling for boxes */
-    }
-     .print-summary-grid h6 { margin-bottom: 5px; color: #555; font-size: 10px; text-transform: uppercase;}
+    .print-summary-grid h6 { margin-bottom: 5px; color: #555; font-size: 10px; text-transform: uppercase;}
      .print-summary-grid p, .print-summary-grid h4 { margin: 0; font-size: 12px; }
      .print-summary-grid h4 { font-weight: bold; }
 
     @media print {
         body { margin: 20px; font-size: 10pt; }
-        .modal-header, .modal-footer, #modal-loader, .btn { display: none; }
+        .modal-header, .modal-footer, #modal-loader, .btn, .nav-pills { display: none !important; } /* Sembunyikan sub-nav saat print */
         .modal-content { box-shadow: none; border-radius: 0; }
         .modal-body { padding: 0 !important; }
         .table-responsive { max-height: none; overflow: visible; }
         .table thead th { position: static; background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
         .table { width: 100%; border-collapse: collapse; margin-top: 15px;}
         .table th, .table td { border: 1px solid #ccc; padding: 6px;}
-        .summary-box { display: none; /* Sembunyikan summary box asli */ }
-        #print-header-info { display: block !important; /* Tampilkan info header saat print */ }
-        /* --- PERBAIKAN: Style Print Header --- */
+        .summary-box { display: none; }
+        #print-header-info { display: block !important; }
         .print-summary-grid {
              grid-template-columns: 1fr 1fr;
-             gap: 10px; /* Kurangi jarak antar item */
-             margin-bottom: 15px; /* Kurangi margin bawah */
+             gap: 10px;
+             margin-bottom: 15px;
              padding: 10px;
              border: 1px solid #ccc;
              background-color: #f8f9fa !important;
             -webkit-print-color-adjust: exact;
          }
          .print-summary-grid div {
-             padding-bottom: 3px; /* Kurangi padding bawah */
+             padding-bottom: 3px;
              border-bottom: 1px dotted #ddd;
          }
           .print-summary-grid h6 {
-              margin-bottom: 2px; /* Kurangi margin bawah heading */
+              margin-bottom: 2px;
               color: #555;
-              font-size: 10px; /* Sedikit lebih besar */
+              font-size: 10px;
               text-transform: uppercase;
               font-weight: normal;
           }
           .print-summary-grid p, .print-summary-grid h4 {
               margin: 0;
-              font-size: 12px; /* Sedikit lebih besar */
+              font-size: 12px;
           }
           .print-summary-grid h4 { font-weight: bold; }
-         /* --- Akhir Perbaikan --- */
-
          tr { page-break-inside: avoid; }
     }
-    /* --- Akhir Style untuk Print Section --- */
 
     .table tbody td {
         padding: 0.875rem 0.75rem;
@@ -304,6 +299,9 @@
     .status-inprogress {
         background-color: #ff9800;
     }
+    .status-waiting {
+        background-color: #6c757d;
+    }
     .loading-spinner {
         display: inline-block;
         width: 1.5rem;
@@ -318,6 +316,20 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
+     /* Style untuk pesan warning di modal */
+    .modal-warning-message {
+        padding: 2rem;
+        text-align: center;
+        background-color: #fff3cd; /* Warna kuning muda */
+        color: #664d03; /* Warna teks coklat tua */
+        border-bottom: 1px solid #ffc107; /* Border kuning */
+    }
+    .modal-warning-message i {
+        font-size: 2rem;
+        margin-bottom: 0.75rem;
+        color: #ffc107; /* Warna ikon kuning */
+    }
+
     @media (max-width: 768px) {
         .card-header-custom {
             padding: 1.5rem 1rem;
@@ -332,7 +344,42 @@
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
         }
+         /* Tampilan sub-nav di mobile */
+        .nav-pills .nav-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+        }
     }
+
+     /* --- Style untuk Sub-Navigasi (Pills) --- */
+    .nav-pills {
+        margin-bottom: 1.5rem; /* Jarak bawah dari pills ke konten */
+        background-color: #e9ecef; /* Latar belakang abu-abu muda */
+        border-radius: 0.5rem; /* Sedikit rounded corner */
+        padding: 0.3rem; /* Padding internal */
+        display: inline-flex; /* Agar pas dengan konten */
+    }
+    .nav-pills .nav-link {
+        color: #495057; /* Warna teks abu-abu gelap */
+        border-radius: 0.375rem; /* Rounded corner untuk link */
+        padding: 0.5rem 1rem; /* Padding link */
+        margin: 0 0.1rem; /* Jarak antar link */
+        font-weight: 500;
+        transition: background-color 0.3s ease, color 0.3s ease; /* Transisi halus */
+    }
+    .nav-pills .nav-link:hover {
+        background-color: #dee2e6; /* Warna hover sedikit lebih gelap */
+    }
+    .nav-pills .nav-link.active {
+        background-color: #17624a; /* Warna hijau tua saat aktif */
+        color: white; /* Teks putih saat aktif */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sedikit shadow saat aktif */
+    }
+     /* Konten di dalam sub-tab */
+    .waiting-plant-content .tab-pane {
+         /* Tidak perlu style khusus lagi jika row sudah ada */
+    }
+
 </style>
 @endpush
 
@@ -344,6 +391,7 @@
             <p class="mb-0 mt-2 opacity-75">Pantau dan kelola semua riwayat verifikasi DO dalam satu tempat</p>
         </div>
         <div class="card-body p-4 p-md-5">
+            <!-- Header dengan Filter dan Navigasi -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <a href="{{ route('do.verify.index') }}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-2"></i>Kembali ke Verifikasi
@@ -353,10 +401,13 @@
                     <select class="form-select form-select-sm sort-options" id="history-sort">
                         <option value="newest">Terbaru</option>
                         <option value="oldest">Terlama</option>
+                        <option value="do-asc">No. DO (A-Z)</option>
+                        <option value="do-desc">No. DO (Z-A)</option>
                     </select>
                 </div>
             </div>
 
+            <!-- Section Filter -->
             <div class="filter-section">
                 <div class="row align-items-center">
                     <div class="col-md-8">
@@ -376,28 +427,41 @@
                 </div>
             </div>
 
+            <!-- Navigasi Tab Utama -->
             <ul class="nav nav-tabs" id="historyTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
-                        <span class="status-indicator status-completed"></span>
-                        Selesai
-                        <span class="history-count">{{ count($completedDos) }}</span>
+                {{-- Urutan: Selesai, Menunggu, Dalam Proses --}}
+                 </li>
+                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="waiting-tab" data-bs-toggle="tab" data-bs-target="#waiting-panel" type="button" role="tab" aria-controls="waiting-panel" aria-selected="false">
+                        <span class="status-indicator status-waiting"></span>
+                        Menunggu
+                        {{-- Hitung total dari semua plant --}}
+                        <span class="history-count">{{ $waitingDos->sum(fn($items) => $items->count()) }}</span>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="inprogress-tab" data-bs-toggle="tab" data-bs-target="#inprogress-panel" type="button" role="tab" aria-controls="inprogress-panel" aria-selected="false">
                         <span class="status-indicator status-inprogress"></span>
                         Dalam Proses
-                        <span class="history-count">{{ count($inProgressDos) }}</span>
+                        <span class="history-count">{{ $inProgressDos->count() }}</span>
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
+                        <span class="status-indicator status-completed"></span>
+                        Selesai
+                        <span class="history-count">{{ $completedDos->count() }}</span>
+                    </button>
             </ul>
 
+            <!-- Konten Tab Utama -->
             <div class="tab-content" id="historyTabContent">
+                <!-- Panel Selesai -->
                 <div class="tab-pane fade show active" id="completed-panel" role="tabpanel" aria-labelledby="completed-tab">
                     <div class="row history-list" id="completed-list">
                         @forelse ($completedDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->VERIFIED_AT)->timestamp }}">
+                                {{-- Card ini bisa diklik --}}
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -416,7 +480,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="col-12">
+                            <div class="col-12 original-empty-state">
                                 <div class="empty-state">
                                     <i class="fas fa-inbox"></i>
                                     <h4 class="text-muted">Belum ada riwayat verifikasi yang selesai</h4>
@@ -426,10 +490,125 @@
                         @endforelse
                     </div>
                 </div>
+
+                <!-- Panel Menunggu -->
+                <div class="tab-pane fade" id="waiting-panel" role="tabpanel" aria-labelledby="waiting-tab">
+                     {{-- Cek apakah ada data sama sekali --}}
+                    @if ($waitingDos->isEmpty())
+                        <div class="col-12 original-empty-state">
+                            <div class="empty-state">
+                                <i class="fas fa-hourglass-start"></i>
+                                <h4 class="text-muted">Tidak ada DO yang menunggu verifikasi</h4>
+                                <p class="mb-0">Data DO yang belum diverifikasi akan muncul di sini setelah diambil dari SAP.</p>
+                                <small>(Pastikan proses pengambilan data otomatis berjalan)</small>
+                            </div>
+                        </div>
+                    @else
+                        {{-- Navigasi Sub-Tab (Pills) untuk Plant --}}
+                        <ul class="nav nav-pills mb-3" id="waitingPlantTab" role="tablist">
+                            {{-- Tab untuk Surabaya (2000) --}}
+                             @php $plant2000 = $waitingDos->get('2000'); @endphp
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {{ $plant2000 ? 'active' : '' }}" id="waiting-plant-2000-tab" data-bs-toggle="pill" data-bs-target="#waiting-plant-2000-panel" type="button" role="tab" aria-controls="waiting-plant-2000-panel" aria-selected="{{ $plant2000 ? 'true' : 'false' }}">
+                                    Surabaya (2000)
+                                    <span class="history-count">{{ $plant2000 ? $plant2000->count() : 0 }}</span>
+                                </button>
+                            </li>
+                             {{-- Tab untuk Semarang (3000) --}}
+                            @php $plant3000 = $waitingDos->get('3000'); @endphp
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {{ !$plant2000 && $plant3000 ? 'active' : '' }}" id="waiting-plant-3000-tab" data-bs-toggle="pill" data-bs-target="#waiting-plant-3000-panel" type="button" role="tab" aria-controls="waiting-plant-3000-panel" aria-selected="{{ !$plant2000 && $plant3000 ? 'true' : 'false' }}">
+                                    Semarang (3000)
+                                    <span class="history-count">{{ $plant3000 ? $plant3000->count() : 0 }}</span>
+                                </button>
+                            </li>
+                            {{-- Anda bisa menambahkan plant lain di sini jika perlu --}}
+                        </ul>
+
+                         {{-- Konten Sub-Tab Plant --}}
+                        <div class="tab-content waiting-plant-content" id="waitingPlantTabContent">
+                            {{-- Konten Plant 2000 (Surabaya) --}}
+                            <div class="tab-pane fade {{ $plant2000 ? 'show active' : '' }}" id="waiting-plant-2000-panel" role="tabpanel" aria-labelledby="waiting-plant-2000-tab">
+                                <div class="row history-list" id="waiting-list-2000">
+                                    @forelse ($plant2000 ?? [] as $items)
+                                        <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->delivery_number . ' ' . $items->customer_name) }}" data-date="{{ \Carbon\Carbon::parse($items->created_at)->timestamp }}">
+                                            {{-- PERUBAHAN: Tambahkan atribut modal & hapus style cursor --}}
+                                            <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->delivery_number }}">
+                                                <div class="card-body">
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <p class="do-number mb-0">{{ $items->delivery_number }}</p>
+                                                        <span class="badge bg-secondary badge-status">Menunggu</span>
+                                                    </div>
+                                                    <p class="customer-name">{{ $items->customer_name }}</p>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <p class="verification-date mb-0">
+                                                            <i class="fas fa-hourglass-start me-1 text-secondary"></i>
+                                                            Data diambil: {{ \Carbon\Carbon::parse($items->created_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                                        </p>
+                                                        {{-- PERUBAHAN: Tambahkan ikon chevron --}}
+                                                        <i class="fas fa-chevron-right text-muted"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="col-12 original-empty-state"> {{-- Tambahkan class original-empty-state --}}
+                                             <div class="empty-state" style="padding: 1.5rem 1rem;"> {{-- Perkecil padding empty state di sub-tab --}}
+                                                <i class="fas fa-inbox"></i>
+                                                <h5 class="text-muted">Tidak ada DO menunggu untuk Surabaya</h5>
+                                            </div>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                             {{-- Konten Plant 3000 (Semarang) --}}
+                            <div class="tab-pane fade {{ !$plant2000 && $plant3000 ? 'show active' : '' }}" id="waiting-plant-3000-panel" role="tabpanel" aria-labelledby="waiting-plant-3000-tab">
+                                <div class="row history-list" id="waiting-list-3000">
+                                    @forelse ($plant3000 ?? [] as $items)
+                                        <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->delivery_number . ' ' . $items->customer_name) }}" data-date="{{ \Carbon\Carbon::parse($items->created_at)->timestamp }}">
+                                             {{-- PERUBAHAN: Tambahkan atribut modal & hapus style cursor --}}
+                                            <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->delivery_number }}">
+                                                <div class="card-body">
+                                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                                        <p class="do-number mb-0">{{ $items->delivery_number }}</p>
+                                                        <span class="badge bg-secondary badge-status">Menunggu</span>
+                                                    </div>
+                                                    <p class="customer-name">{{ $items->customer_name }}</p>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <p class="verification-date mb-0">
+                                                            <i class="fas fa-hourglass-start me-1 text-secondary"></i>
+                                                            Data diambil: {{ \Carbon\Carbon::parse($items->created_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                                        </p>
+                                                         {{-- PERUBAHAN: Tambahkan ikon chevron --}}
+                                                        <i class="fas fa-chevron-right text-muted"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                         <div class="col-12 original-empty-state"> {{-- Tambahkan class original-empty-state --}}
+                                             <div class="empty-state" style="padding: 1.5rem 1rem;"> {{-- Perkecil padding empty state di sub-tab --}}
+                                                <i class="fas fa-inbox"></i>
+                                                <h5 class="text-muted">Tidak ada DO menunggu untuk Semarang</h5>
+                                            </div>
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                             {{-- Anda bisa menambahkan panel plant lain di sini jika perlu --}}
+                        </div>
+                    @endif
+                </div>
+
+
+                <!-- Panel Dalam Proses -->
                 <div class="tab-pane fade" id="inprogress-panel" role="tabpanel" aria-labelledby="inprogress-tab">
                     <div class="row history-list" id="inprogress-list">
-                         @forelse ($inProgressDos as $items)
+                         {{-- --- PERBAIKAN: Menggunakan $items langsung --- --}}
+                        @forelse ($inProgressDos as $items)
                             <div class="col-lg-6 history-item" data-filter-text="{{ strtolower($items->VBELN . ' ' . $items->NAME1) }}" data-date="{{ \Carbon\Carbon::parse($items->updated_at)->timestamp }}">
+                                {{-- Card ini bisa diklik --}}
                                 <div class="card history-card" data-bs-toggle="modal" data-bs-target="#historyDetailModal" data-do-number="{{ $items->VBELN }}">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -440,7 +619,7 @@
                                         <div class="d-flex justify-content-between align-items-center">
                                             <p class="verification-date mb-0">
                                                 <i class="fas fa-sync-alt me-1 text-warning"></i>
-                                                {{ \Carbon\Carbon::parse($items->updated_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
+                                                Aktivitas terakhir: {{ \Carbon\Carbon::parse($items->updated_at)->timezone('Asia/Jakarta')->format('d F Y H:i') }}
                                             </p>
                                             <i class="fas fa-chevron-right text-muted"></i>
                                         </div>
@@ -448,7 +627,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="col-12">
+                            <div class="col-12 original-empty-state">
                                 <div class="empty-state">
                                     <i class="fas fa-clock"></i>
                                     <h4 class="text-muted">Tidak ada verifikasi yang sedang dalam proses</h4>
@@ -458,11 +637,13 @@
                         @endforelse
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 </div>
 
+<!-- Modal Detail -->
 <div class="modal fade" id="historyDetailModal" tabindex="-1" aria-labelledby="historyDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -481,21 +662,13 @@
              <p class="mt-2 text-muted">Memuat data verifikasi...</p>
          </div>
          <div id="modal-content-area" class="d-none">
+             {{-- Container untuk Info Header Cetak --}}
              <div id="print-header-info" class="p-4 border-bottom"></div>
+             {{-- Container untuk Summary Box (Tetap Tampil di Layar) --}}
              <div id="modal-summary-area" class="p-4 border-bottom"></div>
-             <div class="table-responsive">
-                 <table class="table table-hover mb-0">
-                     <thead class="sticky-top bg-light">
-                         <tr>
-                             <th style="width: 5%;" class="ps-4">No.</th>
-                             <th style="width: 45%;">Material</th>
-                             <th style="width: 25%;" class="text-center">Qty Order</th>
-                             <th style="width: 25%;" class="text-center">Qty Scan</th>
-                         </tr>
-                     </thead>
-                     <tbody id="modal-scanned-items-body">
-                     </tbody>
-                 </table>
+             {{-- PERUBAHAN: Container untuk pesan warning atau tabel --}}
+             <div id="modal-detail-content">
+                 {{-- Tabel akan dirender di sini oleh JS --}}
              </div>
          </div>
        </div>
@@ -503,7 +676,8 @@
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
             <i class="fas fa-times me-2"></i>Tutup
         </button>
-        <button type="button" class="btn btn-outline-primary" id="print-details">
+         {{-- PERUBAHAN: Tombol cetak awalnya disembunyikan --}}
+        <button type="button" class="btn btn-outline-primary d-none" id="print-details">
             <i class="fas fa-print me-2"></i>Cetak
         </button>
       </div>
@@ -513,7 +687,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const filterInput = document.getElementById('history-filter');
@@ -522,137 +696,352 @@
         const modalLoader = document.getElementById('modal-loader');
         const modalContent = document.getElementById('modal-content-area');
         const modalDoNumber = document.getElementById('modal-do-number');
-        const modalTableBody = document.getElementById('modal-scanned-items-body');
+        // PERUBAHAN: Ganti modalTableBody menjadi modalDetailContent
+        const modalDetailContent = document.getElementById('modal-detail-content');
         const modalSummaryArea = document.getElementById('modal-summary-area');
         const printHeaderInfo = document.getElementById('print-header-info');
         const totalCountElement = document.getElementById('total-count');
         const printButton = document.getElementById('print-details');
-        let currentHeaderData = null;
+        let currentHeaderData = null; // Simpan data header saat ini
 
-        updateTotalCount();
+        updateTotalCount(); // Panggil saat load
 
         function updateTotalCount() {
-            const activeTabPane = document.querySelector('.tab-pane.active');
+            const activeTabPane = document.querySelector('.tab-pane.active'); // Tab Utama (Selesai/Menunggu/Proses)
             if (activeTabPane) {
-                const visibleItems = activeTabPane.querySelectorAll('.history-item:not([style*="display: none"])');
+                 // Cek apakah ini tab Menunggu (yang punya sub-tab)
+                const activeSubTabPane = activeTabPane.querySelector('.tab-pane.active'); // Sub-Tab (Plant 2000/3000)
+                const targetPane = activeSubTabPane || activeTabPane; // Gunakan sub-tab jika ada, jika tidak, gunakan tab utama
+
+                const visibleItems = targetPane.querySelectorAll('.history-list .history-item:not([style*="display: none"])');
                 totalCountElement.textContent = visibleItems.length;
             }
         }
 
+
         filterInput.addEventListener('keyup', function() {
             const filterText = this.value.toLowerCase();
-            const activeTabPane = document.querySelector('.tab-pane.active');
+            const activeTabPane = document.querySelector('.tab-pane.active'); // Tab Utama
             if (activeTabPane) {
-                const historyItems = activeTabPane.querySelectorAll('.history-item');
-                let visibleCount = 0;
-                let originalEmptyState = activeTabPane.querySelector('.original-empty-state');
-                historyItems.forEach(item => {
-                    const itemText = item.getAttribute('data-filter-text');
-                    if (itemText.includes(filterText)) {
-                        item.style.display = '';
-                        visibleCount++;
+                 // Cek apakah ini tab Menunggu
+                const activeSubTabPane = activeTabPane.querySelector('.tab-pane.active'); // Sub-Tab
+                const targetPane = activeSubTabPane || activeTabPane; // Targetkan sub-tab jika ada
+
+                const historyLists = targetPane.querySelectorAll('.history-list'); // Ambil list di dalam pane target
+                let totalVisibleCount = 0;
+
+                 // Sembunyikan empty state global dulu
+                 let originalEmptyStateGlobal = activeTabPane.querySelector(':scope > .original-empty-state'); // Hanya direct child
+
+                 if (originalEmptyStateGlobal) originalEmptyStateGlobal.style.display = 'none';
+
+
+                historyLists.forEach(list => {
+                    const historyItems = list.querySelectorAll('.history-item');
+                    let listVisibleCount = 0;
+
+                    historyItems.forEach(item => {
+                        const itemText = item.getAttribute('data-filter-text');
+                        if (itemText.includes(filterText)) {
+                            item.style.display = '';
+                            listVisibleCount++;
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+
+                    totalVisibleCount += listVisibleCount;
+
+                    // Handle pesan 'Tidak ada hasil' untuk setiap list
+                    let noResultMessage = list.querySelector('.no-result-message');
+                     let originalListEmptyState = list.querySelector('.original-empty-state'); // empty state sub-tab/list
+
+                    // Sembunyikan empty state asli list jika filter aktif dan ada item di list tsb
+                     if (originalListEmptyState) {
+                         originalListEmptyState.style.display = (filterText !== '' && historyItems.length > 0) ? 'none' : '';
+                     }
+
+
+                    // Tampilkan pesan 'no result' HANYA jika list itu punya item tapi tidak ada yang cocok filter
+                    if (listVisibleCount === 0 && historyItems.length > 0) {
+                         if (!noResultMessage) {
+                            const emptyHtml = `<div class="col-12 no-result-message"><div class="empty-state" style="padding: 1.5rem 1rem;"><i class="fas fa-search"></i><h5 class="text-muted">Tidak ada hasil ditemukan</h5><p class="mb-0 small">Coba ubah kata kunci pencarian</p></div></div>`;
+                            list.insertAdjacentHTML('beforeend', emptyHtml);
+
+                        } else {
+                             // Jika ada pesan 'no result', tampilkan
+                            noResultMessage.style.display = '';
+                        }
+                         // Sembunyikan juga empty state asli jika no result tampil
+                         if(originalListEmptyState) originalListEmptyState.style.display = 'none';
+
                     } else {
-                        item.style.display = 'none';
+                        if (noResultMessage) noResultMessage.style.display = 'none'; // Sembunyikan 'no result' jika ada hasil
+                         // Tampilkan empty state asli JIKA filter kosong DAN memang list itu kosong
+                         if (filterText === '' && historyItems.length === 0 && originalListEmptyState){
+                             originalListEmptyState.style.display = '';
+                         }
                     }
+
+
                 });
-                const listContainer = activeTabPane.querySelector('.history-list');
-                let noResultMessage = listContainer.querySelector('.no-result-message');
-                if (visibleCount === 0 && historyItems.length > 0) {
-                    if (!noResultMessage) {
-                        const emptyHtml = `<div class="col-12 no-result-message"><div class="empty-state"><i class="fas fa-search"></i><h4 class="text-muted">Tidak ada hasil ditemukan</h4><p class="mb-0">Coba ubah kata kunci pencarian</p></div></div>`;
-                        listContainer.insertAdjacentHTML('beforeend', emptyHtml);
-                    }
-                    if (originalEmptyState) originalEmptyState.style.display = 'none';
-                } else {
-                    if (noResultMessage) noResultMessage.remove();
-                    if (historyItems.length === 0 && originalEmptyState) originalEmptyState.style.display = '';
+
+                // Tampilkan original empty state global JIKA filter kosong DAN memang tidak ada item sama sekali di tab itu
+                if (filterText === '' && activeTabPane.querySelectorAll('.history-item').length === 0 && originalEmptyStateGlobal) {
+                    originalEmptyStateGlobal.style.display = '';
                 }
-                totalCountElement.textContent = visibleCount;
+
+                // Update total count BUKAN berdasarkan totalVisibleCount tapi panggil updateTotalCount()
+                // karena total count harus merefleksikan pane yang aktif
+                 updateTotalCount();
             }
         });
 
+
         sortSelect.addEventListener('change', function() {
             const sortValue = this.value;
-            const activeTabPane = document.querySelector('.tab-pane.active');
+            const activeTabPane = document.querySelector('.tab-pane.active'); // Tab Utama
             if (activeTabPane) {
-                const historyList = activeTabPane.querySelector('.history-list');
-                const historyItems = Array.from(activeTabPane.querySelectorAll('.history-item'));
-                historyItems.sort((a, b) => {
-                    const aText = a.querySelector('.do-number').textContent;
-                    const bText = b.querySelector('.do-number').textContent;
-                    const aDate = parseInt(a.getAttribute('data-date'));
-                    const bDate = parseInt(b.getAttribute('data-date'));
-                    switch(sortValue) {
-                        case 'newest': return bDate - aDate;
-                        case 'oldest': return aDate - bDate;
-                        case 'do-asc': return aText.localeCompare(bText);
-                        case 'do-desc': return bText.localeCompare(aText);
-                        default: return 0;
-                    }
+                // Cek apakah ini tab Menunggu
+                const activeSubTabPane = activeTabPane.querySelector('.tab-pane.active'); // Sub-Tab
+                const targetPane = activeSubTabPane || activeTabPane; // Targetkan sub-tab jika ada
+
+                const historyLists = targetPane.querySelectorAll('.history-list');
+
+                historyLists.forEach(historyList => {
+                    const historyItems = Array.from(historyList.querySelectorAll('.history-item'));
+
+                    historyItems.sort((a, b) => {
+                        // Ambil nomor DO dari elemen yang benar di dalam kartu
+                         const aCard = a.querySelector('.card');
+                         const bCard = b.querySelector('.card');
+                         // Tentukan elemen teks DO (bisa '.do-number' atau langsung di card jika beda struktur)
+                         const aTextElement = aCard ? aCard.querySelector('.do-number') : null;
+                         const bTextElement = bCard ? bCard.querySelector('.do-number') : null;
+
+                         // Handle jika elemen tidak ditemukan
+                         const aText = aTextElement ? aTextElement.textContent : '';
+                         const bText = bTextElement ? bTextElement.textContent : '';
+
+
+                        const aDate = parseInt(a.getAttribute('data-date')) || 0; // Fallback ke 0 jika null
+                        const bDate = parseInt(b.getAttribute('data-date')) || 0; // Fallback ke 0 jika null
+
+                        switch(sortValue) {
+                            case 'newest': return bDate - aDate;
+                            case 'oldest': return aDate - bDate;
+                            case 'do-asc': return aText.localeCompare(bText);
+                            case 'do-desc': return bText.localeCompare(aText);
+                            default: return 0;
+                        }
+                    });
+
+                    // Kosongkan list dan tambahkan kembali item yang sudah diurutkan
+                    // Gunakan innerHTML = '' agar lebih bersih
+                    historyList.innerHTML = '';
+                    historyItems.forEach(item => { historyList.appendChild(item); });
                 });
-                historyItems.forEach(item => { historyList.appendChild(item); });
+
+
+                // Panggil ulang filter setelah sorting agar pesan 'no result' benar
                 filterInput.dispatchEvent(new Event('keyup'));
             }
         });
 
         historyDetailModal.addEventListener('show.bs.modal', async function (event) {
             const card = event.relatedTarget;
+             // Verifikasi awal: hanya untuk debugging, bisa dihapus nanti
+            if (!card) {
+                console.error("Modal event triggered without relatedTarget (card).");
+                event.preventDefault();
+                return;
+            }
+             // Cek apakah card memiliki atribut data-do-number
+            if (!card.hasAttribute('data-do-number')) {
+                 console.warn("Card clicked does not have data-do-number attribute. Modal prevented.");
+                event.preventDefault(); // Batalkan pembukaan modal
+                return;
+            }
+
             const doNumber = card.getAttribute('data-do-number');
             modalDoNumber.textContent = doNumber;
-            modalTableBody.innerHTML = '';
-            modalSummaryArea.innerHTML = '';
-            printHeaderInfo.innerHTML = '';
-            currentHeaderData = null;
-            modalLoader.classList.remove('d-none');
-            modalContent.classList.add('d-none');
+             // PERUBAHAN: Kosongkan modalDetailContent
+            modalDetailContent.innerHTML = '';
+            modalSummaryArea.innerHTML = ''; // Kosongkan summary
+            printHeaderInfo.innerHTML = ''; // Kosongkan print header
+            currentHeaderData = null; // Reset data header
+            modalLoader.classList.remove('d-none'); // Tampilkan loader
+            modalContent.classList.add('d-none'); // Sembunyikan konten utama
+            printButton.classList.add('d-none'); // Sembunyikan tombol cetak
 
             try {
-                const cacheBuster = new Date().getTime();
-                const url = `{{ url('/delivery-order/history/details') }}/${doNumber}?t=${cacheBuster}`;
-
+                const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
                 const response = await fetch(url);
                 if (!response.ok) {
-                    const errorJson = await response.json().catch(() => ({}));
-                    throw new Error(errorJson.error || 'Gagal mengambil data dari server');
+                    const errorJson = await response.json().catch(() => ({})); // Tangkap jika respons bukan JSON
+                    throw new Error(errorJson.error || `Gagal mengambil data dari server (Status: ${response.status})`);
                 }
                 const data = await response.json();
-                currentHeaderData = data.header || {};
+                currentHeaderData = data.header || {}; // Simpan data header
 
-                if (data.summary) {
-                    const totalOrder = data.summary.total_order;
-                    const totalScan = data.summary.total_scan;
+                // --- PERUBAHAN LOGIKA RENDER ---
+                const isWaitingOnly = currentHeaderData.status === 'waiting';
+
+                // Render Summary
+                let summaryHtml = '';
+                let printHeaderHtml = '';
+                 let statusText = 'N/A';
+                 let totalOrder = 0;
+                 let totalScan = 0;
+
+                if (isWaitingOnly) {
+                    // Summary khusus untuk status waiting
+                    statusText = 'MENUNGGU SCAN';
+                    summaryHtml = `
+                        <div class="row text-center summary-box summary-secondary"> {{-- Warna abu-abu --}}
+                            <div class="col-12"> {{-- Kolom penuh --}}
+                                <h6>STATUS</h6>
+                                <h4 class="fw-bold mb-0">${statusText}</h4>
+                                <small>DO ini belum masuk proses verifikasi.</small>
+                            </div>
+                        </div>`;
+                     printHeaderHtml = `
+                        <div class="print-summary-grid">
+                            <div><h6>Pelanggan</h6><p>${currentHeaderData.customer || 'N/A'}</p></div>
+                             <div><h6>Status Verifikasi</h6><p>${statusText}</p></div>
+                             <div><h6>No. DO</h6><h4>${doNumber}</h4></div>
+                             <div><h6>Alamat</h6><p>N/A</p></div>
+                             <div><h6>Total Qty Order</h6><h4>N/A</h4></div>
+                            <div><h6>Total Qty Scan</h6><h4>N/A</h4></div>
+                        </div>`;
+
+                } else if (data.summary) {
+                    // Summary normal untuk Selesai/Proses
+                    totalOrder = data.summary.total_order;
+                    totalScan = data.summary.total_scan;
                     const isComplete = currentHeaderData.VERIFIED_AT != null;
-                    const summaryClass = isComplete ? 'summary-success' : (totalScan > 0 ? 'summary-warning' : 'summary-danger');
-                    const statusText = isComplete ? 'SELESAI' : (totalScan > 0 ? 'PROSES' : 'BELUM DIMULAI');
 
-                    const summaryHtml = `<div class="row text-center summary-box ${summaryClass}"><div class="col-4"><h6>TOTAL QTY ORDER</h6><h3 class="fw-bold mb-0">${totalOrder.toLocaleString()}</h3></div><div class="col-4"><h6>TOTAL QTY SCAN</h6><h3 class="fw-bold mb-0">${totalScan.toLocaleString()}</h3></div><div class="col-4"><h6>STATUS</h6><h4 class="fw-bold mb-0">${statusText}</h4></div></div>`;
-                    modalSummaryArea.innerHTML = summaryHtml;
-
-                    const printHeaderHtml = `<div class="print-summary-grid"><div><h6>Pelanggan</h6><p>${currentHeaderData.customer || 'N/A'}</p></div><div><h6>Alamat</h6><p>${currentHeaderData.address || 'N/A'}</p></div><div><h6>No. Kontainer</h6><p>${currentHeaderData.container_no || 'N/A'}</p></div><div><h6>Status Verifikasi</h6><p>${statusText}</p></div><div><h6>Total Qty Order</h6><h4>${totalOrder.toLocaleString()}</h4></div><div><h6>Total Qty Scan</h6><h4>${totalScan.toLocaleString()}</h4></div></div>`;
-                    printHeaderInfo.innerHTML = printHeaderHtml;
-                }
-
-                const items = data.items;
-                if (items.length > 0) {
-                    items.forEach(item => { // 1. Hapus ', index'
-                        const materialDisplay = /^[0-9]+$/.test(item.material_number) ? item.material_number.replace(/^0+/, '') : item.material_number;
-                        const qtyOrder = parseInt(item.qty_order);
-                        const qtyScan = parseInt(item.qty_scan);
-                        const qtyClass = qtyOrder === qtyScan ? 'qty-match' : 'qty-mismatch';
-
-                        // 2. Ganti 'index + 1' kembali menjadi 'item.no'
-                        const row = `<tr><td class="ps-4">${item.no}</td><td><div class="material-number">${materialDisplay}</div><div class="material-description">${item.description}</div></td><td class="text-center">${qtyOrder.toLocaleString()}</td><td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td></tr>`;
-                        modalTableBody.innerHTML += row;
-                    });
+                    let summaryClass = 'summary-danger'; // Default jika belum dimulai (seharusnya tidak terjadi di sini)
+                    statusText = 'BELUM DIMULAI';
+                    if (isComplete) {
+                        summaryClass = 'summary-success';
+                        statusText = 'SELESAI';
+                    } else if (totalScan > 0) {
+                        summaryClass = 'summary-warning';
+                        statusText = 'PROSES';
                     } else {
-                    modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-box-open fa-2x text-muted mb-2"></i><p class="text-muted mb-0">Tidak ada data scan ditemukan.</p></td></tr>`;
+                         // Kasus khusus: ada di do_list tapi belum ada scan
+                         summaryClass = 'summary-secondary'; // Abu-abu
+                         statusText = 'BELUM DISCAN';
+                    }
+
+
+                    summaryHtml = `
+                        <div class="row text-center summary-box ${summaryClass}">
+                            <div class="col-4">
+                                <h6>TOTAL QTY ORDER</h6>
+                                <h3 class="fw-bold mb-0">${totalOrder.toLocaleString()}</h3>
+                            </div>
+                            <div class="col-4">
+                                <h6>TOTAL QTY SCAN</h6>
+                                <h3 class="fw-bold mb-0">${totalScan.toLocaleString()}</h3>
+                            </div>
+                            <div class="col-4">
+                                <h6>STATUS</h6>
+                                <h4 class="fw-bold mb-0">${statusText}</h4>
+                            </div>
+                        </div>`;
+
+                    printHeaderHtml = `
+                        <div class="print-summary-grid">
+                            <div><h6>Pelanggan</h6><p>${currentHeaderData.customer || 'N/A'}</p></div>
+                            <div><h6>Alamat</h6><p>${currentHeaderData.address || 'N/A'}</p></div>
+                            <div><h6>No. Kontainer</h6><p>${currentHeaderData.container_no || 'N/A'}</p></div>
+                            <div><h6>Status Verifikasi</h6><p>${statusText}</p></div>
+                            <div><h6>Total Qty Order</h6><h4>${totalOrder.toLocaleString()}</h4></div>
+                            <div><h6>Total Qty Scan</h6><h4>${totalScan.toLocaleString()}</h4></div>
+                        </div>`;
+                } else {
+                     console.warn('Data summary tidak ditemukan untuk DO: ' + doNumber);
+                     summaryHtml = '<p class="text-warning text-center">Data summary tidak tersedia.</p>';
+                     printHeaderHtml = '<p class="text-warning text-center">Data summary tidak tersedia.</p>';
+                }
+                 modalSummaryArea.innerHTML = summaryHtml;
+                 printHeaderInfo.innerHTML = printHeaderHtml;
+
+
+                // Render Konten Detail (Tabel atau Pesan Warning)
+                const items = data.items;
+                if (isWaitingOnly) {
+                    // Tampilkan pesan warning
+                    modalDetailContent.innerHTML = `
+                        <div class="modal-warning-message">
+                            <i class="fas fa-info-circle"></i>
+                            <h5 class="mb-1">Informasi</h5>
+                            <p class="mb-0">Delivery Order ini masih menunggu untuk diproses. Belum ada data scan yang tersedia.</p>
+                        </div>`;
+                    printButton.classList.add('d-none'); // Sembunyikan tombol cetak
+                } else if (items && items.length > 0) {
+                    // Render tabel jika ada item
+                    let tableRowsHtml = '';
+                    items.forEach((item, index) => {
+                        const qtyOrder = parseInt(item.qty_order || 0);
+                        const qtyScan = parseInt(item.qty_scan || 0);
+                        const qtyClass = qtyOrder === qtyScan ? 'qty-match' : 'qty-mismatch';
+                        const itemNumber = item.no ? item.no : (index + 1);
+                        const materialStr = String(item.material_number || '');
+                        const materialDisplay = /^[0-9]+$/.test(materialStr) ? materialStr.replace(/^0+/, '') : materialStr;
+
+                        tableRowsHtml += `
+                            <tr>
+                                <td class="ps-4">${itemNumber}</td>
+                                <td>
+                                    <div class="material-number">${materialDisplay}</div>
+                                    <div class="material-description">${item.description || 'N/A'}</div>
+                                </td>
+                                <td class="text-center">${qtyOrder.toLocaleString()}</td>
+                                <td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td>
+                            </tr>`;
+                    });
+                     // Bungkus tabel dalam struktur yang benar
+                    modalDetailContent.innerHTML = `
+                        <div class="table-responsive">
+                             <table class="table table-hover mb-0">
+                                 <thead class="sticky-top bg-light">
+                                     <tr>
+                                         <th style="width: 5%;" class="ps-4">No.</th>
+                                         <th style="width: 45%;">Material</th>
+                                         <th style="width: 25%;" class="text-center">Qty Order</th>
+                                         <th style="width: 25%;" class="text-center">Qty Scan</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody>${tableRowsHtml}</tbody>
+                             </table>
+                         </div>`;
+                    printButton.classList.remove('d-none'); // Tampilkan tombol cetak
+                } else {
+                    // Tampilkan pesan jika tidak ada item scan (tapi bukan waiting)
+                     modalDetailContent.innerHTML = `
+                        <div class="modal-warning-message">
+                             <i class="fas fa-box-open"></i>
+                             <h5 class="mb-1">Informasi</h5>
+                             <p class="mb-0">Belum ada data scan ditemukan untuk Delivery Order ini.</p>
+                         </div>`;
+                    printButton.classList.add('d-none'); // Sembunyikan tombol cetak
                 }
 
             } catch (error) {
                 console.error('Error fetching history details:', error);
                 modalSummaryArea.innerHTML = '';
                 printHeaderInfo.innerHTML = '';
-                modalTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i><p class="text-danger mb-0">Gagal memuat data: ${error.message}</p></td></tr>`;
+                 // Tampilkan pesan error di area konten detail
+                modalDetailContent.innerHTML = `
+                    <div class="modal-warning-message text-danger bg-danger-subtle border-danger"> {{-- Style error --}}
+                         <i class="fas fa-exclamation-triangle text-danger"></i>
+                         <h5 class="mb-1">Error</h5>
+                         <p class="mb-0">Gagal memuat data: ${error.message}</p>
+                     </div>`;
+                 printButton.classList.add('d-none'); // Sembunyikan tombol cetak
             } finally {
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
@@ -660,8 +1049,15 @@
         });
 
         printButton.addEventListener('click', function() {
+             // Cek apakah ada tabel di dalam modalDetailContent
+             const tableElement = modalDetailContent.querySelector('.table-responsive');
+             if (!tableElement) {
+                 console.warn("Tombol cetak diklik, tetapi tidak ada tabel untuk dicetak.");
+                 return; // Jangan lakukan apa-apa jika tidak ada tabel
+             }
+
             const doNumber = modalDoNumber.textContent;
-            const tableContent = document.querySelector('#modal-content-area .table-responsive').innerHTML;
+            const tableContent = tableElement.innerHTML;
             const headerPrintContent = printHeaderInfo.innerHTML;
 
             const printWindow = window.open('', '_blank');
@@ -729,19 +1125,46 @@
             `);
             printWindow.document.close();
             setTimeout(() => {
-                printWindow.print();
-            }, 500);
+                try {
+                    printWindow.print();
+                    // Tutup jendela cetak setelah beberapa saat jika tidak ditutup otomatis
+                    // setTimeout(() => { printWindow.close(); }, 2000);
+                } catch (e) {
+                     console.error("Gagal mencetak:", e);
+                     // Mungkin tampilkan pesan ke pengguna jika perlu
+                     printWindow.close(); // Tutup jika gagal
+                }
+            }, 500); // Tunggu sebentar agar konten dimuat
         });
 
-        document.querySelectorAll('#historyTab button').forEach(tab => {
-            tab.addEventListener('shown.bs.tab', function() {
+        // Event listener untuk update total count saat TAB UTAMA berganti
+        document.querySelectorAll('#historyTab > .nav-item > .nav-link').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(event) {
                 updateTotalCount();
-                 filterInput.dispatchEvent(new Event('keyup'));
+                 // Reset dan panggil filter saat tab utama berganti
+                 filterInput.value = ''; // Kosongkan input filter
+                 filterInput.dispatchEvent(new Event('keyup')); // Picu filter
+                 // Reset sort ke default (Terbaru)
+                 sortSelect.value = 'newest';
+                 sortSelect.dispatchEvent(new Event('change'));
             });
         });
 
+         // Event listener untuk update total count saat SUB-TAB PLANT berganti
+         document.querySelectorAll('#waitingPlantTab > .nav-item > .nav-link').forEach(subTab => {
+             subTab.addEventListener('shown.bs.tab', function(event) {
+                 updateTotalCount();
+                 // Panggil filter lagi agar pesan 'no result' benar
+                 filterInput.dispatchEvent(new Event('keyup'));
+                  // Reset sort ke default (Terbaru) saat sub-tab berganti
+                 sortSelect.value = 'newest';
+                 sortSelect.dispatchEvent(new Event('change'));
+             });
+         });
+
+
+        // Panggil filter sekali saat halaman load untuk tab yang aktif
         if (document.querySelector('.tab-pane.active')) {
-             updateTotalCount();
              filterInput.dispatchEvent(new Event('keyup'));
         }
 

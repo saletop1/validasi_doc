@@ -6,6 +6,7 @@ use App\Http\Controllers\DeliveryOrderController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Middleware\EnsurePasswordIsChanged; // --- PERBAIKAN: Import kelas middleware ---
+use App\Http\Controllers\OutstandingDoController;
 
 // Rute Publik (tidak perlu login)
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -40,3 +41,4 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
+Route::post('/outstanding-do/fetch', [OutstandingDoController::class, 'fetchAndStoreOutstandingDos'])->name('outstanding.fetch');

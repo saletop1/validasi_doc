@@ -30,6 +30,7 @@ def connect_sap(user, passwd):
 def get_do_details():
     """
     Mengambil data mentah DO dari SAP untuk disimpan di database lokal.
+    (RFC LAMA: Z_FM_YSDR002)
     """
     data = request.get_json()
     username = data.get('username')
@@ -81,6 +82,69 @@ def get_do_details():
             conn.close()
             logging.info("Koneksi SAP ditutup.")
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8009, debug=True)
+# --- (BARU) ENDPOINT UNTUK TAB MENUNGGU ---
+@app.route('/api/sap/get_outstanding_dos', methods=['POST'])
+def get_outstanding_dos():
+    """
+    Mengambil data DO 'Menunggu' (Outstanding) dari SAP.
+    (RFC BARU: Z_FM_YSDR039)
+    """
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
 
+    if not all([username, password]):
+        return jsonify({"success": False, "message": "Permintaan tidak lengkap (username/password)."}), 400
+
+    conn = None
+    try:
+        conn = connect_sap(username, password)
+        if not conn:
+            return jsonify({"success": False, "message": "Koneksi SAP gagal."}), 500
+
+        all_t_data1 = []
+
+        # 1. Panggil untuk P_BAGIAN = 1 (Surabaya)
+        logging.info("Memanggil RFC Z_FM_YSDR039 untuk P_BAGIAN=1 (Surabaya)")
+        result_sby = conn.call('Z_FM_YSDR039', P_BAGIAN='1')
+        t_data1_sby = result_sby.get('T_DATA1', [])
+        if t_data1_sby:
+            logging.info(f"Data Surabaya ditemukan ({len(t_data1_sby)} baris).")
+            all_t_data1.extend(t_data1_sby)
+        else:
+            logging.warning("Tidak ada data T_DATA1 ditemukan untuk Surabaya.")
+
+        # 2. Panggil untuk P_BAGIAN = 2 (Semarang)
+        logging.info("Memanggil RFC Z_FM_YSDR039 untuk P_BAGIAN=2 (Semarang)")
+        result_smg = conn.call('Z_FM_YSDR039', P_BAGIAN='2')
+        t_data1_smg = result_smg.get('T_DATA1', [])
+        if t_data1_smg:
+            logging.info(f"Data Semarang ditemukan ({len(t_data1_smg)} baris).")
+            all_t_data1.extend(t_data1_smg)
+        else:
+            logging.warning("Tidak ada data T_DATA1 ditemukan untuk Semarang.")
+
+        # 3. Kirim hasil gabungan
+        if not all_t_data1:
+            logging.warning("Tidak ada data T_DATA1 ditemukan untuk kedua P_BAGIAN.")
+            return jsonify({"success": False, "message": "Tidak ada data outstanding ditemukan."}), 404
+
+        logging.info(f"Total data T_DATA1 yang dikirim: {len(all_t_data1)} baris.")
+        return jsonify({
+            "success": True,
+            "data": all_t_data1  # Sesuai ekspektasi OutstandingDoController.php
+        })
+
+    except Exception as e:
+        error_msg = f"Error saat memproses outstanding DO: {str(e)}"
+        logging.error(error_msg, exc_info=True)
+        return jsonify({"success": False, "message": error_msg}), 500
+    finally:
+        if conn:
+            conn.close()
+            logging.info("Koneksi SAP ditutup.")
+# --- AKHIR BLOK BARU ---
+
+
+if __name__ == '__main__':
+ app.run(host='127.0.0.1', port=8009, debug=True)
