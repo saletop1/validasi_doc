@@ -433,7 +433,6 @@
                  </li>
                  <li class="nav-item" role="presentation">
                     <button class="nav-link" id="waiting-tab" data-bs-toggle="tab" data-bs-target="#waiting-panel" type="button" role="tab" aria-controls="waiting-panel" aria-selected="false">
-                        <span class="status-indicator status-waiting"></span>
                         Menunggu
                         {{-- Hitung total dari semua plant --}}
                         <span class="history-count">{{ $waitingDos->sum(fn($items) => $items->count()) }}</span>
@@ -441,14 +440,12 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="inprogress-tab" data-bs-toggle="tab" data-bs-target="#inprogress-panel" type="button" role="tab" aria-controls="inprogress-panel" aria-selected="false">
-                        <span class="status-indicator status-inprogress"></span>
                         Dalam Proses
                         <span class="history-count">{{ $inProgressDos->count() }}</span>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
-                        <span class="status-indicator status-completed"></span>
                         Selesai
                         <span class="history-count">{{ $completedDos->count() }}</span>
                     </button>
@@ -673,10 +670,12 @@
          </div>
        </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-primary d-none me-auto" id="process-do-button">
+            <i class="fas fa-play me-2"></i>Proses Verifikasi
+        </button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
             <i class="fas fa-times me-2"></i>Tutup
         </button>
-         {{-- PERUBAHAN: Tombol cetak awalnya disembunyikan --}}
         <button type="button" class="btn btn-outline-primary d-none" id="print-details">
             <i class="fas fa-print me-2"></i>Cetak
         </button>
@@ -702,6 +701,7 @@
         const printHeaderInfo = document.getElementById('print-header-info');
         const totalCountElement = document.getElementById('total-count');
         const printButton = document.getElementById('print-details');
+        const processDoButton = document.getElementById('process-do-button'); // TAMBAHKAN INI
         let currentHeaderData = null; // Simpan data header saat ini
 
         updateTotalCount(); // Panggil saat load
@@ -873,6 +873,7 @@
             modalLoader.classList.remove('d-none'); // Tampilkan loader
             modalContent.classList.add('d-none'); // Sembunyikan konten utama
             printButton.classList.add('d-none'); // Sembunyikan tombol cetak
+            processDoButton.classList.add('d-none');
 
             try {
                 const url = `{{ url('/delivery-order/history/details') }}/${doNumber}`;
@@ -884,25 +885,40 @@
                 const data = await response.json();
                 currentHeaderData = data.header || {}; // Simpan data header
 
-                // --- PERUBAHAN LOGIKA RENDER ---
+                // --- LOGIKA STATUS TERPADU ---
                 const isWaitingOnly = currentHeaderData.status === 'waiting';
+                const summary = data.summary;
+                const items = data.items;
+                const totalScan = (summary && summary.total_scan !== undefined) ? parseInt(summary.total_scan) : 0;
+                const totalOrder = (summary && summary.total_order !== undefined) ? parseInt(summary.total_order) : 0;
 
-                // Render Summary
+                // Ini adalah KUNCI utamanya:
+                // Tampilkan layout "Menunggu" jika statusnya 'waiting' ATAU jika 'totalScan' masih 0
+                const showAsWaitingLayout = isWaitingOnly || (!isWaitingOnly && totalScan === 0);
+
+                // Tentukan visibilitas tombol
+                const shouldShowProcessButton = showAsWaitingLayout;
+                const shouldShowPrintButton = !showAsWaitingLayout && items && items.length > 0;
+                // --- AKHIR LOGIKA TERPADU ---
+
+
+                // --- LOGIKA RENDER ---
                 let summaryHtml = '';
                 let printHeaderHtml = '';
-                 let statusText = 'N/A';
-                 let totalOrder = 0;
-                 let totalScan = 0;
+                let statusText = 'N/A';
 
-                if (isWaitingOnly) {
-                    // Summary khusus untuk status waiting
-                    statusText = 'MENUNGGU SCAN';
+                // 1. RENDER SUMMARY (BERDASARKAN LOGIKA BARU)
+                if (showAsWaitingLayout) {
+                    // Tampilkan layout "Menunggu Scan" (Gambar 1)
+                    statusText = isWaitingOnly ? 'MENUNGGU SCAN' : 'BELUM DISCAN';
+                    let infoText = isWaitingOnly ? 'DO ini belum masuk proses verifikasi.' : 'DO ini sudah dibuka namun belum discan.';
+
                     summaryHtml = `
-                        <div class="row text-center summary-box summary-secondary"> {{-- Warna abu-abu --}}
-                            <div class="col-12"> {{-- Kolom penuh --}}
+                        <div class="row text-center summary-box summary-secondary">
+                            <div class="col-12">
                                 <h6>STATUS</h6>
                                 <h4 class="fw-bold mb-0">${statusText}</h4>
-                                <small>DO ini belum masuk proses verifikasi.</small>
+                                <small>${infoText}</small>
                             </div>
                         </div>`;
                      printHeaderHtml = `
@@ -915,26 +931,19 @@
                             <div><h6>Total Qty Scan</h6><h4>N/A</h4></div>
                         </div>`;
 
-                } else if (data.summary) {
-                    // Summary normal untuk Selesai/Proses
-                    totalOrder = data.summary.total_order;
-                    totalScan = data.summary.total_scan;
+                } else if (summary) {
+                    // Tampilkan layout Selesai/Dalam Proses (scan > 0)
                     const isComplete = currentHeaderData.VERIFIED_AT != null;
 
-                    let summaryClass = 'summary-danger'; // Default jika belum dimulai (seharusnya tidak terjadi di sini)
+                    let summaryClass = 'summary-danger';
                     statusText = 'BELUM DIMULAI';
                     if (isComplete) {
                         summaryClass = 'summary-success';
                         statusText = 'SELESAI';
-                    } else if (totalScan > 0) {
+                    } else if (totalScan > 0) { // Ini pasti true jika !showAsWaitingLayout
                         summaryClass = 'summary-warning';
                         statusText = 'PROSES';
-                    } else {
-                         // Kasus khusus: ada di do_list tapi belum ada scan
-                         summaryClass = 'summary-secondary'; // Abu-abu
-                         statusText = 'BELUM DISCAN';
                     }
-
 
                     summaryHtml = `
                         <div class="row text-center summary-box ${summaryClass}">
@@ -970,19 +979,20 @@
                  printHeaderInfo.innerHTML = printHeaderHtml;
 
 
-                // Render Konten Detail (Tabel atau Pesan Warning)
-                const items = data.items;
-                if (isWaitingOnly) {
-                    // Tampilkan pesan warning
+                // 2. RENDER KONTEN DETAIL (BERDASARKAN LOGIKA BARU)
+                if (showAsWaitingLayout) {
+                    // Tampilkan pesan warning (Layout Gambar 1)
+                    let infoText = isWaitingOnly ? 'Delivery Order ini masih menunggu untuk diproses. Belum ada data scan yang tersedia.' : 'Belum ada data scan ditemukan untuk Delivery Order ini.';
+                    let iconClass = isWaitingOnly ? 'fa-info-circle' : 'fa-box-open';
+
                     modalDetailContent.innerHTML = `
                         <div class="modal-warning-message">
-                            <i class="fas fa-info-circle"></i>
+                            <i class="fas ${iconClass}"></i>
                             <h5 class="mb-1">Informasi</h5>
-                            <p class="mb-0">Delivery Order ini masih menunggu untuk diproses. Belum ada data scan yang tersedia.</p>
+                            <p class="mb-0">${infoText}</p>
                         </div>`;
-                    printButton.classList.add('d-none'); // Sembunyikan tombol cetak
                 } else if (items && items.length > 0) {
-                    // Render tabel jika ada item
+                    // Render tabel jika ada item (Layout Gambar 2, tapi scan > 0)
                     let tableRowsHtml = '';
                     items.forEach((item, index) => {
                         const qtyOrder = parseInt(item.qty_order || 0);
@@ -1003,7 +1013,6 @@
                                 <td class="text-center ${qtyClass}">${qtyScan.toLocaleString()}</td>
                             </tr>`;
                     });
-                     // Bungkus tabel dalam struktur yang benar
                     modalDetailContent.innerHTML = `
                         <div class="table-responsive">
                              <table class="table table-hover mb-0">
@@ -1018,16 +1027,27 @@
                                  <tbody>${tableRowsHtml}</tbody>
                              </table>
                          </div>`;
-                    printButton.classList.remove('d-none'); // Tampilkan tombol cetak
                 } else {
-                    // Tampilkan pesan jika tidak ada item scan (tapi bukan waiting)
+                    // Fallback jika tidak ada item (aneh, tapi ditangani)
                      modalDetailContent.innerHTML = `
                         <div class="modal-warning-message">
                              <i class="fas fa-box-open"></i>
                              <h5 class="mb-1">Informasi</h5>
-                             <p class="mb-0">Belum ada data scan ditemukan untuk Delivery Order ini.</p>
+                             <p class="mb-0">Data item tidak ditemukan untuk DO ini.</p>
                          </div>`;
-                    printButton.classList.add('d-none'); // Sembunyikan tombol cetak
+                }
+
+                // 3. TERAPKAN VISIBILITAS TOMBOL (BERDASARKAN LOGIKA BARU)
+                if (shouldShowProcessButton) {
+                    processDoButton.classList.remove('d-none');
+                } else {
+                    processDoButton.classList.add('d-none');
+                }
+
+                if (shouldShowPrintButton) {
+                    printButton.classList.remove('d-none');
+                } else {
+                    printButton.classList.add('d-none');
                 }
 
             } catch (error) {
@@ -1042,6 +1062,7 @@
                          <p class="mb-0">Gagal memuat data: ${error.message}</p>
                      </div>`;
                  printButton.classList.add('d-none'); // Sembunyikan tombol cetak
+                 processDoButton.classList.add('d-none'); // Sembunyikan tombol proses
             } finally {
                 modalLoader.classList.add('d-none');
                 modalContent.classList.remove('d-none');
@@ -1135,6 +1156,19 @@
                      printWindow.close(); // Tutup jika gagal
                 }
             }, 500); // Tunggu sebentar agar konten dimuat
+        });
+
+        processDoButton.addEventListener('click', function() {
+            const doNumber = modalDoNumber.textContent;
+            if (doNumber) {
+                // Simpan DO ke sessionStorage agar dibaca oleh halaman verifikasi
+                sessionStorage.setItem('lastSearchedDO', doNumber);
+                // Redirect ke halaman verifikasi
+                window.location.href = "{{ route('do.verify.index') }}";
+            } else {
+                console.error("Tidak bisa memproses DO, nomor DO tidak ditemukan di modal.");
+                alert('Gagal memuat nomor DO. Silakan coba lagi.');
+            }
         });
 
         // Event listener untuk update total count saat TAB UTAMA berganti
