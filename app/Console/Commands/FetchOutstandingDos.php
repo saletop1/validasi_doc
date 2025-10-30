@@ -3,10 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-// Hapus controller, kita tidak membutuhkannya lagi
-// use App\Http\Controllers\OutstandingDoController;
 use Illuminate\Support\Facades\Log;
-// Tambahkan library yang kita butuhkan
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -70,8 +67,6 @@ class FetchOutstandingDos extends Command
                 Log::info('[Cron Job] Menemukan data di $data["data"]["t_data1"]');
 
             } elseif (isset($data['data']) && is_array($data['data'])) {
-                // Struktur fallback (sesuai log Anda): {"data": [...]}
-                 // Cek apakah elemen pertama punya kunci SAP (misal 'VBELN') untuk memastikan ini bukan array kosong biasa
                  if (!empty($data['data']) && isset($data['data'][0]['VBELN'])) {
                      $tData1 = $data['data'];
                      Log::info('[Cron Job] Menemukan data langsung di $data["data"]');

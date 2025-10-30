@@ -36,7 +36,7 @@
         border: 1px solid #e9ecef;
         border-radius: 0.875rem;
         margin-bottom: 1.25rem;
-        transition: all 0.3s ease;
+        transition: all 0.1s ease;
         cursor: pointer; /* Kembalikan cursor pointer */
         position: relative;
         overflow: hidden;
@@ -155,6 +155,18 @@
         background-color: transparent;
         border-bottom: 3px solid #1ddec8;
     }
+    /* Style dropdown agar terlihat aktif saat itemnya aktif */
+    .nav-tabs .nav-item.dropdown .dropdown-menu .dropdown-item.active {
+        background-color: #00000012;
+        color: black;
+    }
+    .nav-tabs .nav-link.dropdown-toggle.active {
+        color: #0a2f23ff;
+        font-weight: 600;
+        background-color: transparent;
+        border-bottom: 3px solid #1ddec8;
+    }
+
     .tab-content {
         min-height: 400px; /* Jaga tinggi minimum untuk semua tab */
     }
@@ -167,6 +179,35 @@
         color: #495057;
         margin-left: 0.5rem;
     }
+    /* Style untuk dropdown-item */
+    #waiting-dropdown-toggle .history-count {
+        background-color: #ffc107; /* Warna kuning (Bootstrap warning) */
+        color: #000000ff; /* Teks gelap agar terbaca */
+    }
+    /* Style untuk dropdown-item */
+    .dropdown-menu .dropdown-item {
+    }
+    .dropdown-menu .dropdown-item.active .history-count {
+        background-color: #ffffff;
+        color: #000000ff;
+        /* PERUBAHAN: Sesuaikan warna count di dropdown aktif */
+        background-color: #e9ecef; /* Samakan dengan count non-aktif */
+        color: #495057;
+    }
+    .dropdown-menu .dropdown-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .dropdown-menu .dropdown-item .history-count {
+        background-color: #e9ecef;
+    }
+    .dropdown-menu .dropdown-item.active .history-count {
+        background-color: #ffc107;
+        color: #000000ff;
+    }
+
+
     .sort-options {
         background: white;
         border: 1px solid #dee2e6;
@@ -372,7 +413,7 @@
     }
     .nav-pills .nav-link.active {
         background-color: #17624a; /* Warna hijau tua saat aktif */
-        color: white; /* Teks putih saat aktif */
+        color: white; /* Teks putih saataktif */
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Sedikit shadow saat aktif */
     }
      /* Konten di dalam sub-tab */
@@ -401,8 +442,6 @@
                     <select class="form-select form-select-sm sort-options" id="history-sort">
                         <option value="newest">Terbaru</option>
                         <option value="oldest">Terlama</option>
-                        <option value="do-asc">No. DO (A-Z)</option>
-                        <option value="do-desc">No. DO (Z-A)</option>
                     </select>
                 </div>
             </div>
@@ -429,13 +468,11 @@
 
             <!-- Navigasi Tab Utama -->
             <ul class="nav nav-tabs" id="historyTab" role="tablist">
-                {{-- Urutan: Selesai, Menunggu, Dalam Proses --}}
-                 </li>
-                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="waiting-tab" data-bs-toggle="tab" data-bs-target="#waiting-panel" type="button" role="tab" aria-controls="waiting-panel" aria-selected="false">
-                        Menunggu
-                        {{-- Hitung total dari semua plant --}}
-                        <span class="history-count">{{ $waitingDos->sum(fn($items) => $items->count()) }}</span>
+                {{-- PERUBAHAN: Urutan diubah, 'Selesai' dan 'Dalam Proses' jadi tab biasa --}}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
+                        Selesai
+                        <span class="history-count">{{ $completedDos->count() }}</span>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -444,11 +481,35 @@
                         <span class="history-count">{{ $inProgressDos->count() }}</span>
                     </button>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed-panel" type="button" role="tab" aria-controls="completed-panel" aria-selected="true">
-                        Selesai
-                        <span class="history-count">{{ $completedDos->count() }}</span>
+
+                @php
+                    $plant2000 = $waitingDos->get('2000');
+                    $plant3000 = $waitingDos->get('3000');
+                    $waitingTotal = $waitingDos->sum(fn($items) => $items->count());
+                @endphp
+                <li class="nav-item dropdown" role="presentation">
+                    {{-- PERUBAHAN: Diubah dari <a> menjadi <button> agar konsisten --}}
+                    <button class="nav-link dropdown-toggle" data-bs-toggle="dropdown" type="button" role="button" aria-expanded="false" id="waiting-dropdown-toggle">
+                        Menunggu
+                        <span class="history-count">{{ $waitingTotal }}</span>
                     </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                             {{-- Link ini akan mengaktifkan panel #waiting-panel DAN sub-tab #waiting-plant-3000-panel --}}
+                            <a class="dropdown-item" href="#" data-bs-toggle="tab" data-bs-target="#waiting-panel" id="dropdown-select-semarang">
+                                Semarang
+                                <span class="history-count">{{ $plant3000 ? $plant3000->count() : 0 }}</span>
+                            </a>
+                        </li>
+                        <li>
+                            {{-- Link ini akan mengaktifkan panel #waiting-panel DAN sub-tab #waiting-plant-2000-panel --}}
+                            <a class="dropdown-item" href="#" data-bs-toggle="tab" data-bs-target="#waiting-panel" id="dropdown-select-surabaya">
+                                Surabaya <span class="history-count">{{ $plant2000 ? $plant2000->count() : 0 }}</span>
+                            </a>
+                        </li>
+
+                    </ul>
+                </li>
             </ul>
 
             <!-- Konten Tab Utama -->
@@ -502,7 +563,7 @@
                         </div>
                     @else
                         {{-- Navigasi Sub-Tab (Pills) untuk Plant --}}
-                        <ul class="nav nav-pills mb-3" id="waitingPlantTab" role="tablist">
+                        <ul class="nav nav-pills mb-3 d-none" id="waitingPlantTab" role="tablist">
                             {{-- Tab untuk Surabaya (2000) --}}
                              @php $plant2000 = $waitingDos->get('2000'); @endphp
                             <li class="nav-item" role="presentation">
@@ -686,24 +747,29 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{{-- PENTING: Muat file JS Bootstrap DULUAN --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script> --}}
+{{-- PERBAIKAN v3: Baris di atas DIHAPUS. Kita asumsikan layouts.app sudah memuat Bootstrap JS --}}
+
+{{-- Skrip kustom Anda di tag terpisah SETELAHNYA --}}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- (Variabel lain seperti filterInput, sortSelect, dll.) ---
         const filterInput = document.getElementById('history-filter');
         const sortSelect = document.getElementById('history-sort');
         const historyDetailModal = document.getElementById('historyDetailModal');
         const modalLoader = document.getElementById('modal-loader');
         const modalContent = document.getElementById('modal-content-area');
         const modalDoNumber = document.getElementById('modal-do-number');
-        // PERUBAHAN: Ganti modalTableBody menjadi modalDetailContent
         const modalDetailContent = document.getElementById('modal-detail-content');
         const modalSummaryArea = document.getElementById('modal-summary-area');
         const printHeaderInfo = document.getElementById('print-header-info');
         const totalCountElement = document.getElementById('total-count');
         const printButton = document.getElementById('print-details');
-        const processDoButton = document.getElementById('process-do-button'); // TAMBAHKAN INI
-        let currentHeaderData = null; // Simpan data header saat ini
+        const processDoButton = document.getElementById('process-do-button');
+        let currentHeaderData = null;
 
+        // ... (Fungsi updateTotalCount, listener filterInput, listener sortSelect) ...
         updateTotalCount(); // Panggil saat load
 
         function updateTotalCount() {
@@ -848,6 +914,62 @@
             }
         });
 
+        // --- PERBAIKAN v3: Logika untuk Dropdown 'Menunggu' ---
+        // Kita HANYA perlu menangani aktivasi sub-tab.
+        // Sisanya (membuka dropdown, mengganti tab utama) sudah di-handle Bootstrap.
+        // ----------------------------------------------------
+        const surabayaSubTabTrigger = document.getElementById('waiting-plant-2000-tab');
+        const semarangSubTabTrigger = document.getElementById('waiting-plant-3000-tab');
+
+        const dropdownSurabaya = document.getElementById('dropdown-select-surabaya');
+        const dropdownSemarang = document.getElementById('dropdown-select-semarang');
+        const waitingDropdownToggle = document.getElementById('waiting-dropdown-toggle');
+        const inProgressTab = document.getElementById('inprogress-tab');
+        const completedTab = document.getElementById('completed-tab');
+
+        // 1. Saat item dropdown "Surabaya" diklik
+        if (dropdownSurabaya && surabayaSubTabTrigger) {
+            dropdownSurabaya.addEventListener('click', function (e) {
+                // 'data-bs-toggle="tab"' di HTML akan menangani perpindahan panel utama.
+                // Kita HANYA perlu memastikan sub-tab yang benar aktif.
+                const subTab = new bootstrap.Tab(surabayaSubTabTrigger);
+                subTab.show();
+            });
+        }
+
+        // 2. Saat item dropdown "Semarang" diklik
+        if (dropdownSemarang && semarangSubTabTrigger) {
+            dropdownSemarang.addEventListener('click', function (e) {
+                // 'data-bs-toggle="tab"' di HTML akan menangani perpindahan panel utama.
+                // Kita HANYA perlu memastikan sub-tab yang benar aktif.
+                const subTab = new bootstrap.Tab(semarangSubTabTrigger);
+                subTab.show();
+            });
+        }
+
+        // 3. Logika untuk style 'active' pada tombol dropdown
+        // Saat tab dropdown (Surabaya/Semarang) ditampilkan
+        document.querySelectorAll('#historyTab .dropdown-item').forEach(item => {
+            item.addEventListener('shown.bs.tab', function() {
+                if (waitingDropdownToggle) {
+                    waitingDropdownToggle.classList.add('active');
+                }
+                updateTotalCount();
+            });
+        });
+
+        // Saat tab lain (Selesai/Proses) ditampilkan
+        const removeDropdownActive = (event) => {
+            if (waitingDropdownToggle) {
+                waitingDropdownToggle.classList.remove('active');
+            }
+        };
+        if (inProgressTab) inProgressTab.addEventListener('shown.bs.tab', removeDropdownActive);
+        if (completedTab) completedTab.addEventListener('shown.bs.tab', removeDropdownActive);
+        // --- AKHIR PERBAIKAN v3 ---
+
+
+        // ... (Listener historyDetailModal) ...
         historyDetailModal.addEventListener('show.bs.modal', async function (event) {
             const card = event.relatedTarget;
              // Verifikasi awal: hanya untuk debugging, bisa dihapus nanti
@@ -1069,6 +1191,7 @@
             }
         });
 
+        // ... (Listener printButton dan processDoButton) ...
         printButton.addEventListener('click', function() {
              // Cek apakah ada tabel di dalam modalDetailContent
              const tableElement = modalDetailContent.querySelector('.table-responsive');
@@ -1172,7 +1295,8 @@
         });
 
         // Event listener untuk update total count saat TAB UTAMA berganti
-        document.querySelectorAll('#historyTab > .nav-item > .nav-link').forEach(tab => {
+        // Juga tambahkan listener untuk style 'active' dropdown
+        document.querySelectorAll('#historyTab > .nav-item > .nav-link:not(.dropdown-toggle)').forEach(tab => {
             tab.addEventListener('shown.bs.tab', function(event) {
                 updateTotalCount();
                  // Reset dan panggil filter saat tab utama berganti
@@ -1195,6 +1319,17 @@
                  sortSelect.dispatchEvent(new Event('change'));
              });
          });
+
+        // Event listener untuk item dropdown untuk MENGATUR 'active' state pada toggle
+        document.querySelectorAll('#historyTab .dropdown-item').forEach(item => {
+            item.addEventListener('shown.bs.tab', function() {
+                if (waitingDropdownToggle) {
+                    waitingDropdownToggle.classList.add('active');
+                }
+                // Update total count juga saat sub-tab diaktifkan via dropdown
+                updateTotalCount();
+            });
+        });
 
 
         // Panggil filter sekali saat halaman load untuk tab yang aktif
