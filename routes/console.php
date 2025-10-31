@@ -10,7 +10,7 @@
     })->purpose('Display an inspiring quote');
 
     Schedule::command('outstanding:fetch')
-        ->cron('0 */5 * * *')
+        ->cron('0 */2 * * *')
         ->timezone('Asia/Jakarta')
         ->before(function () {
              // Log sederhana saat dimulai
