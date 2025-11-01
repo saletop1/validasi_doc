@@ -388,7 +388,7 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text-javascript"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const doNumberInput = document.getElementById('do_number');
@@ -406,6 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let scannedHUs = new Set();
     let isCompletionNotified = false;
     let multiItemHuMap = {};
+    let isProcessingScan = false; // Flag untuk mencegah scan ganda saat awaiting
 
     const logoutForm = document.getElementById('logout-form');
     if (logoutForm) {
@@ -621,9 +622,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
 
-    function processScannedBarcode(barcode) {
-        if (!currentDOData) return;
+    // Fungsi processScannedBarcode diubah menjadi async
+    async function processScannedBarcode(barcode) {
+        if (!currentDOData || isProcessingScan) return; // Jangan proses jika scan sebelumnya masih berjalan
+
+        isProcessingScan = true; // Set flag
         const originalBarcode = barcode.trim();
         const code = /^[0-9]+$/.test(originalBarcode) ? originalBarcode.replace(/^0+/, '') : originalBarcode;
 
@@ -641,154 +646,179 @@ document.addEventListener('DOMContentLoaded', function() {
 
          console.log(`Scan: ${code}, Brunswick: ${isBrunswick}, MultiItemHU: ${isMultiItemHu}, AssociatedItems: ${associatedItemNos}`);
 
-        if (isMultiItemHu) {
-             isHUscan = true;
-             console.log(`HU ${code} adalah multi-item untuk Brunswick.`);
+        try { // Bungkus semua logika dalam try-finally
+            if (isMultiItemHu) {
+                console.log(`HU ${code} adalah multi-item untuk Brunswick.`);
 
-             if (scannedHUs.has(code)) {
-                 showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
-                 return;
-             }
+                if (scannedHUs.has(code)) {
+                    showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
+                    isProcessingScan = false; // Reset flag
+                    return;
+                }
 
-             affectedItems = currentDOData.items.filter(item => {
-                 return item.item_no !== undefined && item.item_no !== null && associatedItemNos.includes(String(item.item_no));
-             });
+                affectedItems = currentDOData.items.filter(item => {
+                    return item.item_no !== undefined && item.item_no !== null && associatedItemNos.includes(String(item.item_no));
+                });
 
-             if (affectedItems.length === 0) {
-                  showAlert('Error Internal', `Item terkait (${associatedItemNos.join(', ')}) untuk multi-item HU ${code} tidak ditemukan.`, 'error');
-                  console.error("Item tidak ditemukan untuk associatedItemNos:", associatedItemNos, "di currentDOData.items:", currentDOData.items);
-                  return;
-             }
-             foundItem = affectedItems[0];
-             batchNumber = foundItem.hu_details?.find(d => d.hu_no === code)?.charg2 || null;
+                if (affectedItems.length === 0) {
+                    showAlert('Error Internal', `Item terkait (${associatedItemNos.join(', ')}) untuk multi-item HU ${code} tidak ditemukan.`, 'error');
+                    console.error("Item tidak ditemukan untuk associatedItemNos:", associatedItemNos, "di currentDOData.items:", currentDOData.items);
+                    isProcessingScan = false; // Reset flag
+                    return;
+                }
+                foundItem = affectedItems[0];
+                batchNumber = foundItem.hu_details?.find(d => d.hu_no === code)?.charg2 || null;
 
-             console.log(`HU ${code} mempengaruhi ${affectedItems.length} item:`, affectedItems.map(i => i.item_no));
+                console.log(`HU ${code} mempengaruhi ${affectedItems.length} item:`, affectedItems.map(i => i.item_no));
 
-             scannedHUs.add(code);
-             let allItemsUpdated = true;
-             let itemsToSave = [];
+                let itemsToSave = [];
+                let uiUpdateTasks = [];
 
-             affectedItems.forEach(item => {
-                 const progressKey = `${item.material}-${item.item_no}`;
-                 const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
-                 if (!scanTextEl) {
-                     console.error(`Elemen progress text ${progressKey} tidak ditemukan untuk multi-item HU.`);
-                     allItemsUpdated = false;
-                     return;
-                 }
-                 let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
+                affectedItems.forEach(item => {
+                    const progressKey = `${item.material}-${item.item_no}`;
+                    const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
+                    if (!scanTextEl) {
+                        console.error(`Elemen progress text ${progressKey} tidak ditemukan untuk multi-item HU.`);
+                        return; // Lewati item ini
+                    }
+                    let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
-                 const qtyToAddForThisItem = Math.max(0, qtyOrder - currentScan);
-                 currentScan = qtyOrder;
+                    const qtyToAddForThisItem = Math.max(0, qtyOrder - currentScan);
+                    const newScanTotal = qtyOrder; // UI dipaksa complete
 
-                 console.log(`Memproses item ${item.item_no}: currentScan=${currentScan}, qtyOrder=${qtyOrder}, qtyToAddForThisItem=${qtyToAddForThisItem}`);
+                    console.log(`Memproses item ${item.item_no}: currentScan=${currentScan}, qtyOrder=${qtyOrder}, qtyToAddForThisItem=${qtyToAddForThisItem}`);
 
-                 scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
-                 updateProgressBarColor(progressKey, currentScan, qtyOrder);
+                    // Simpan data untuk di-save ke DB
+                    itemsToSave.push({
+                        do_number: currentDOData.do_number,
+                        material_number: item.material,
+                        item_number: String(item.item_no),
+                        scanned_code: originalBarcode,
+                        batch_number: batchNumber,
+                        qty_scanned: qtyToAddForThisItem // Kirim qty yang ditambahkan saja
+                    });
 
-                 itemsToSave.push({
-                     do_number: currentDOData.do_number,
-                     material_number: item.material,
-                     item_number: String(item.item_no),
-                     scanned_code: originalBarcode,
-                     batch_number: batchNumber,
-                     qty_scanned: qtyToAddForThisItem // Kirim qty yang ditambahkan saja
-                 });
-             });
+                    // Simpan tugas untuk update UI (agar bisa di-await)
+                    uiUpdateTasks.push({
+                        element: scanTextEl,
+                        progressKey: progressKey,
+                        newScan: newScanTotal,
+                        order: qtyOrder
+                    });
+                });
 
-             if (allItemsUpdated && itemsToSave.length > 0) {
-                  showAlert('Berhasil!', `Multi-item HU ${code} discan, ${affectedItems.length} item diperbarui.`, 'success');
-                  itemsToSave.forEach(scanData => saveScanToDatabase(scanData));
-             } else if (!allItemsUpdated) {
-                  showAlert('Error Sebagian', `Multi-item HU ${code} discan, namun beberapa item gagal diperbarui.`, 'warning');
-             }
+                if (itemsToSave.length > 0) {
+                    // Kirim SEMUA data scan ke DB dan TUNGGU
+                    await Promise.all(itemsToSave.map(scanData => saveScanToDatabase(scanData)));
 
-             updateSummary();
-             updateHUDetailView();
+                    // SETELAH berhasil save, baru update UI
+                    scannedHUs.add(code);
+                    uiUpdateTasks.forEach(task => {
+                        task.element.textContent = `${task.newScan} / ${task.order}`;
+                        updateProgressBarColor(task.progressKey, task.newScan, task.order);
+                    });
 
-        } else {
-             console.log(`Memproses scan biasa untuk ${code}.`);
-             for (const item of currentDOData.items) {
-                 if (item.is_hu && item.hu_details) {
-                      const matchingHuDetails = item.hu_details.filter(d => d.hu_no === code);
-                      if (matchingHuDetails.length > 0) {
-                          foundItem = item;
-                          isHUscan = true;
-                          huDetails = matchingHuDetails;
-                          batchNumber = huDetails[0].charg2;
-                          break;
-                      }
-                 }
-                 if (!item.is_hu && item.batch_no === code) {
-                     foundItem = item;
-                     isHUscan = false;
-                     scanQtyToAdd = 1;
-                     batchNumber = item.batch_no;
-                     break;
-                 }
-             }
+                    showAlert('Berhasil!', `Multi-item HU ${code} discan, ${affectedItems.length} item diperbarui.`, 'success');
 
-             if (foundItem && isHUscan && scannedHUs.has(code)) {
-                 showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
-                 return;
-             }
+                    // SETELAH UI di-update, baru update summary
+                    updateSummary();
+                    updateHUDetailView();
+                }
 
-             if (foundItem) {
-                 const progressKey = `${foundItem.material}-${foundItem.item_no}`;
-                 const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
-                 if (!scanTextEl) {
-                      console.error(`Elemen progress text tidak ditemukan untuk key: ${progressKey}`);
-                      showAlert('Error Internal', 'Komponen UI tidak ditemukan. Coba refresh.', 'error');
-                      return;
-                 }
-                 let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
+            } else {
+                console.log(`Memproses scan biasa untuk ${code}.`);
+                for (const item of currentDOData.items) {
+                    if (item.is_hu && item.hu_details) {
+                        const matchingHuDetails = item.hu_details.filter(d => d.hu_no === code);
+                        if (matchingHuDetails.length > 0) {
+                            foundItem = item;
+                            isHUscan = true;
+                            huDetails = matchingHuDetails;
+                            batchNumber = huDetails[0].charg2;
+                            break;
+                        }
+                    }
+                    if (!item.is_hu && item.batch_no === code) {
+                        foundItem = item;
+                        isHUscan = false;
+                        scanQtyToAdd = 1;
+                        batchNumber = item.batch_no;
+                        break;
+                    }
+                }
 
-                 if (isHUscan) {
-                     if (isBrunswick) {
-                         scanQtyToAdd = huDetails.reduce((sum, detail) => sum + (detail.qty_hu || 0), 0);
-                         console.log(`Single HU Brunswick ${code}, total qty: ${scanQtyToAdd}`);
-                     } else {
-                         scanQtyToAdd = huDetails[0]?.qty_hu || 0;
-                          console.log(`Single HU Lain ${code}, qty: ${scanQtyToAdd}`);
-                     }
-                      if (scanQtyToAdd === 0) {
-                          console.warn("Qty untuk HU adalah 0.", huDetails);
-                          showAlert('Info', `Kuantitas untuk HU ${code} adalah 0.`, 'info');
-                          scannedHUs.add(code);
-                          updateHUDetailView();
-                          return;
-                      }
-                 }
+                if (foundItem && isHUscan && scannedHUs.has(code)) {
+                    showAlert('Duplikat!', `HU ${code} sudah pernah discan untuk DO ini.`, 'warning');
+                    isProcessingScan = false; // Reset flag
+                    return;
+                }
 
-                 if (currentScan + scanQtyToAdd <= qtyOrder) {
-                     const qtyToAddForThisScan = scanQtyToAdd;
-                     currentScan += scanQtyToAdd;
-                     if (isHUscan) {
-                         scannedHUs.add(code);
-                     }
+                if (foundItem) {
+                    const progressKey = `${foundItem.material}-${foundItem.item_no}`;
+                    const scanTextEl = document.getElementById(`progresstext-${progressKey}`);
+                    if (!scanTextEl) {
+                        console.error(`Elemen progress text tidak ditemukan untuk key: ${progressKey}`);
+                        showAlert('Error Internal', 'Komponen UI tidak ditemukan. Coba refresh.', 'error');
+                        isProcessingScan = false; // Reset flag
+                        return;
+                    }
+                    let [currentScan, qtyOrder] = scanTextEl.textContent.split(' / ').map(Number);
 
-                     showAlert('Berhasil!', `Item ${foundItem.material} (${foundItem.item_no}) discan (+${qtyToAddForThisScan}).`, 'success');
-                     saveScanToDatabase({ // Simpan satu record
-                         do_number: currentDOData.do_number,
-                         material_number: foundItem.material,
-                         item_number: String(foundItem.item_no),
-                         scanned_code: originalBarcode,
-                         batch_number: batchNumber,
-                         qty_scanned: qtyToAddForThisScan
-                     });
+                    if (isHUscan) {
+                        if (isBrunswick) {
+                            scanQtyToAdd = huDetails.reduce((sum, detail) => sum + (detail.qty_hu || 0), 0);
+                        } else {
+                            scanQtyToAdd = huDetails[0]?.qty_hu || 0;
+                        }
+                        if (scanQtyToAdd === 0) {
+                            console.warn("Qty untuk HU adalah 0.", huDetails);
+                            showAlert('Info', `Kuantitas untuk HU ${code} adalah 0.`, 'info');
+                            scannedHUs.add(code);
+                            updateHUDetailView();
+                            isProcessingScan = false; // Reset flag
+                            return;
+                        }
+                    }
 
-                     scanTextEl.textContent = `${currentScan} / ${qtyOrder}`;
-                     updateProgressBarColor(progressKey, currentScan, qtyOrder);
+                    if (currentScan + scanQtyToAdd <= qtyOrder) {
+                        const qtyToAddForThisScan = scanQtyToAdd;
+                        const newScanTotal = currentScan + scanQtyToAdd;
 
+                        // TUNGGU save ke DB
+                        await saveScanToDatabase({
+                            do_number: currentDOData.do_number,
+                            material_number: foundItem.material,
+                            item_number: String(foundItem.item_no),
+                            scanned_code: originalBarcode,
+                            batch_number: batchNumber,
+                            qty_scanned: qtyToAddForThisScan
+                        });
 
-                     updateSummary();
-                     if(isHUscan) updateHUDetailView();
-                 } else {
-                      showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}) untuk item ${foundItem.item_no}.`, 'warning');
-                 }
-             } else {
-                 showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di item DO ini.`, 'error');
-             }
+                        // SETELAH berhasil save, baru update UI
+                        if (isHUscan) {
+                            scannedHUs.add(code);
+                        }
+                        showAlert('Berhasil!', `Item ${foundItem.material} (${foundItem.item_no}) discan (+${qtyToAddForThisScan}).`, 'success');
+                        scanTextEl.textContent = `${newScanTotal} / ${qtyOrder}`;
+                        updateProgressBarColor(progressKey, newScanTotal, qtyOrder);
+
+                        // SETELAH UI di-update, baru update summary
+                        updateSummary();
+                        if(isHUscan) updateHUDetailView();
+
+                    } else {
+                        showAlert('Melebihi!', `Scan ${isHUscan ? 'HU' : 'batch'} ${code} (+${scanQtyToAdd}) akan melebihi kuantitas order (${qtyOrder}) untuk item ${foundItem.item_no}.`, 'warning');
+                    }
+                } else {
+                    showAlert('Gagal!', `Kode "${originalBarcode}" tidak ditemukan di item DO ini.`, 'error');
+                }
+            }
+        } catch (error) {
+            // Tangkap error dari saveScanToDatabase
+            console.error("Proses scan gagal karena save DB error:", error);
+            // Alert sudah ditampilkan oleh saveScanToDatabase, jadi tidak perlu lagi.
+        } finally {
+            isProcessingScan = false; // Selalu reset flag setelah selesai
         }
     }
 
@@ -805,23 +835,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Fungsi saveScanToDatabase diubah agar melempar error (throw)
     async function saveScanToDatabase(scanData) {
          try {
-            await fetchWithTimeout('{{ route("do.verify.scan") }}', {
+            const response = await fetchWithTimeout('{{ route("do.verify.scan") }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                body: JSON.stringify(scanData) // Kirim data tunggal
+                body: JSON.stringify(scanData)
             });
+
+            // fetchWithTimeout sudah melempar error jika response.ok false,
+            // tapi kita bisa tambahkan cek JSON jika perlu
+            const data = await response.json();
+            if (!data.success) { // Jika server mengembalikan {success: false}
+                 throw new Error(data.message || 'Server menolak penyimpanan');
+            }
+
             console.log('Scan berhasil disimpan ke DB:', scanData);
+            // Tidak perlu return true, ketiadaan error sudah cukup
         } catch (error) {
             console.error('Gagal menyimpan scan ke DB:', error.message);
             if (error.message && error.message.includes('array')) {
                  showAlert('Error Validasi', 'Data item number tidak valid. Coba refresh halaman.', 'error');
             } else {
-                showAlert('Gagal Simpan', 'Gagal menyimpan data scan ke server. Perubahan mungkin tidak tersimpan.', 'error');
+                // Tampilkan alert di sini agar terpusat
+                showAlert('Gagal Simpan', `Gagal menyimpan data scan: ${error.message}. Perubahan dibatalkan.`, 'error');
             }
+            throw error; // Lempar ulang error agar processScannedBarcode bisa menangkapnya
         }
     }
+
+    // --- PERUBAHAN UTAMA SELESAI ---
 
 
     function updateSummary() {
@@ -861,14 +905,21 @@ document.addEventListener('DOMContentLoaded', function() {
                  console.error("Tidak bisa mengirim notifikasi, data DO tidak lengkap.");
                  return;
             }
-            await fetchWithTimeout('{{ route("do.verify.complete") }}', {
+            // Kita tidak perlu menunggu (await) notifikasi email, jalankan saja di background
+            fetchWithTimeout('{{ route("do.verify.complete") }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
                 body: JSON.stringify({ do_number: currentDOData.do_number })
+            }).then(() => {
+                 console.log('Notifikasi email berhasil dipicu untuk DO:', currentDOData.do_number);
+            }).catch(error => {
+                 // Tangkap error jika pengiriman notifikasi gagal, tapi jangan blokir user
+                 console.error('Gagal memicu pengiriman email:', error.message);
+                 // Tidak perlu alert, ini proses background
             });
-             console.log('Notifikasi email berhasil dipicu untuk DO:', currentDOData.do_number);
         } catch(error) {
-            console.error('Gagal memicu pengiriman email:', error.message);
+            // Catch error sinkron jika ada (jarang terjadi)
+            console.error('Error sinkron saat memicu email:', error.message);
         }
     }
 
@@ -973,19 +1024,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-        if (isScanCooldown) return;
+        if (isScanCooldown || isProcessingScan) return; // Tambahkan cek isProcessingScan
         isScanCooldown = true;
+
+        // Panggil versi async dari processScannedBarcode
+        // Kita tidak perlu 'await' di sini karena onScanSuccess bukan async
+        // 'finally' block di dalam processScannedBarcode akan mereset flag
         processScannedBarcode(decodedText);
+
         if (window.navigator.vibrate) { window.navigator.vibrate(100); }
         //cameraScannerModal.hide();
-        setTimeout(() => { isScanCooldown = false; }, 1000);
+        setTimeout(() => { isScanCooldown = false; }, 1000); // Cooldown untuk scan berikutnya
     }
 
     function onScanFailure(error) {
-       
+
     }
 
 });
 </script>
 @endpush
-
