@@ -35,7 +35,7 @@ class FetchOutstandingDos extends Command
         $this->info('Memulai pengambilan data outstanding DO...');
 
         // --- SEMUA LOGIKA PINDAH KE SINI ---
-        $pythonApiUrl = 'http://127.0.0.1:8009/api/sap/get_outstanding_dos';
+        $pythonApiUrl = 'http://192.168.90.27:5007/api/sap/get_outstanding_dos';
         $sapUsername = 'auto_email';
         $sapPassword = '11223344';
 

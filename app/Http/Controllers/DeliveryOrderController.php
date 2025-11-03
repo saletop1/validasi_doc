@@ -265,7 +265,7 @@ class DeliveryOrderController extends Controller
             ]);
 
 
-            $pythonApiUrl = 'http://127.0.0.1:8009/api/sap/get_do_details';
+            $pythonApiUrl = 'http://192.168.90.27:5007/api/sap/get_do_details';
             Log::info('Menghubungi API Python di: ' . $pythonApiUrl);
 
             $response = Http::timeout(30)->post($pythonApiUrl, [ // Gunakan URL dari variabel

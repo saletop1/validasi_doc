@@ -45,7 +45,7 @@ class OutstandingDoController extends Controller
         $sapPassword = '11223344'; // Sesuaikan
 
         // PERHATIAN: Asumsi URL endpoint di Python. Sesuaikan jika berbeda.
-        $pythonApiUrl = 'http://127.0.0.1:8009/api/sap/get_outstanding_dos'; // <-- GANTI INI JIKA PERLU
+        $pythonApiUrl = 'http://192.168.90.27:5007/api/sap/get_outstanding_dos'; // <-- GANTI INI JIKA PERLU
 
         $allResults = [];
         $fetchErrors = false;
